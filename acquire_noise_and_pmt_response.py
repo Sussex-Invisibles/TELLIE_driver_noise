@@ -48,8 +48,8 @@ if __name__=="__main__":
     trigger_level = 0.5 # half peak minimum
     falling_edge = True
     min_trigger = -0.004
-    y_div_units = [1,0.2] # volts
-    x_div_units = 4e-9 # seconds
+    y_div_units = [1,0.02] # volts
+    x_div_units = 20e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
     record_length = 1e3 # trace is 100e3 samples long
     half_length = record_length / 2 # For selecting region about trigger point
@@ -59,12 +59,15 @@ if __name__=="__main__":
     scope.set_horizontal_delay(x_offset) #shift to the left 2 units
     scope.set_single_acquisition() # Single signal acquisition mode
     scope.set_record_length(record_length)
+    scope.set_active_channel(1)
+    scope.set_active_channel(3)
     scope.set_data_mode(half_length-50, half_length+50)
     #scope.set_edge_trigger(trigger, 1, True) # Rising edge trigger 
+    y_offset = [-2.5*y_div_units[0],0.05]
     
     for i in range(len(scope_channels)):
-	    y_offset = -2.5*y_div_units[i] # offset in y (2.5 divisions up)
 	    scope.set_channel_y(scope_channels[i], y_div_units[i], pos=2.5)
+	    scope.set_display_y(scope_channels[i], y_div_units[i], offset=y_offset[i])
 	    #scope.set_display_y(scope_chan, y_div_units, offset=y_offset)
 	    scope.set_channel_termination(scope_channels[i], termination[i])
     scope.lock()
@@ -73,17 +76,17 @@ if __name__=="__main__":
 
 
     #Create a new, timestamped, summary file
-    sweep_noise.check_dir('./driver_noise')
-    sweep_noise.check_dir("./pmt_response")
-    sweep_noise.check_dir("./pin_readings")
+    saveDirNoise = sweep_noise.check_dir('./driver_noise')
+    saveDirPMTResponse = sweep_noise.check_dir("./pmt_response")
+    saveDirPINResponse = sweep_noise.check_dir("./pin_response")
 
-    saveDirNoise = sweep_noise.check_dir("./driver_noise/Box_%02d" % (box))
-    saveDirPMTResponse = sweep_noise.check_dir("./pmt_response/Box_%02d" % (box))
-    saveDirPINResponse = sweep_noise.check_dir("./pin_readings/Box_%02d" % (box))
+    saveDirNoise = sweep_noise.check_dir("%s/Box_%02d" % (saveDirNoise,box))
+    saveDirPMTResponse =  sweep_noise.check_dir("%s/Box_%02d" % (saveDirPMTResponse,box))
+    saveDirPINResponse = sweep_noise.check_dir("%s/Box_%02d" % (saveDirPINResponse,box))
     
     saveDirNoise = sweep_noise.check_dir("%s/Channel_%02d" % (saveDirNoise,channel))
-    saveDirPMTResponse = sweep_noise.check_dir("%s/Channel_%02d" % (saveDirPMTResponse,channel))
-    saveDirPINResponse = sweep_noise.check_dir("%s/Channel_%02d" % (saveDirPINResponse,channel))
+    saveDirPMTResponse = sweep_noise.check_dir("%s/Channel_%02d/" % (saveDirPMTResponse,channel))
+    saveDirPINResponse = sweep_noise.check_dir("%s/Channel_%02d/" % (saveDirPINResponse,channel))
 
     #Run 1KHz for 10 mins save 100 traces at intervals of 30 secs extract PIN response
     start_time = time.time()
@@ -95,15 +98,15 @@ if __name__=="__main__":
         if ((int(run_time))%30)==0:
             print run_time
 	    timestamp = time.strftime("%y%m%d_%H.%M.%S",time.gmtime())
-	    output_dirname_noise = sweep_noise.check_dir("%s/Time__%s" % (saveDirNoise,timestamp))
-	    output_dirname_pmt = sweep_noise.check_dir("%s/Time__%s" % (saveDirPMTResponse,timestamp))
+	    output_dirname_noise = ("%s/Time__%s" % (saveDirNoise,timestamp))
+	    output_dirname_pmt = ("%s/Time__%s" % (saveDirPMTResponse,timestamp))
 	    output_filename_pin = sweep_noise.check_dir("%s/Time__%s.dat" % (saveDirPINResponse,timestamp))
             saveDirs[0] = output_dirname_pmt
             saveDirs[1] = output_dirname_noise
-            
+            print saveDirs 
             pin,rms = sweep_noise.sweep_noise(saveDirs,box,channel,ipw,delay,scope)
-            pinFile = fopen(output_filename_pin,"w")
-            pinFile.write("%f %f\n" % (pin,rms))
+            pinFile = open(output_filename_pin,"w")
+            pinFile.write("%s %s\n" % (pin,rms))
             pinFile.close()
             
             

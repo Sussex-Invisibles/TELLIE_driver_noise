@@ -52,7 +52,9 @@ def check_dir(dname):
     """Check if directory exists, create it if it doesn't"""
     direc = os.path.dirname(dname)
     try:
+	print "Checking dir: "+direc
         os.stat(direc)
+        print os.stat(direc)
     except:
         os.mkdir(direc)
         print "Made directory %s...." % dname
@@ -183,7 +185,7 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     height = 16383    
     fibre_delay = 0
     trigger_delay = 0
-    pulse_number = 1000
+    pulse_number = 11100
     #first select the correct channel and provide settings
     logical_channel = (box-1)*8 + channel
     
@@ -202,8 +204,6 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     time.sleep(0.1)
 
     # File system stuff
-    check_dir("%s/" % (dirs_out[0]))
-    check_dir("%s/" % (dirs_out[1]))
     fname0 = "%sWidth%05d" % (dirs_out[0],width)
     fname1 = "%sWidth%05d" % (dirs_out[1],width)
     
@@ -220,7 +220,7 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     	pin = None
    	# while not comms_flags.valid_pin(pin,channel):
     	while pin==None:
-	    pin,rms = sc.tmp_read_rms()
+	    pin,rms,chans = sc.tmp_read_rms()
 
         return pin[logical_channel],rms[logical_channel]
 
