@@ -51,12 +51,8 @@ def set_scope(scope):
 def check_dir(dname):
     """Check if directory exists, create it if it doesn't"""
     direc = os.path.dirname(dname)
-    try:
-	print "Checking dir: "+direc
-        os.stat(direc)
-        print os.stat(direc)
-    except:
-        os.mkdir(direc)
+    if not os.path.exists(direc):
+        print os.makedirs(direc)
         print "Made directory %s...." % dname
     return dname    
 

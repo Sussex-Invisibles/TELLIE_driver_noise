@@ -84,7 +84,7 @@ if __name__=="__main__":
     saveDirPMTResponse =  sweep_noise.check_dir("%s/Box_%02d" % (saveDirPMTResponse,box))
     saveDirPINResponse = sweep_noise.check_dir("%s/Box_%02d" % (saveDirPINResponse,box))
     
-    saveDirNoise = sweep_noise.check_dir("%s/Channel_%02d" % (saveDirNoise,channel))
+    saveDirNoise = sweep_noise.check_dir("%s/Channel_%02d/" % (saveDirNoise,channel))
     saveDirPMTResponse = sweep_noise.check_dir("%s/Channel_%02d/" % (saveDirPMTResponse,channel))
     saveDirPINResponse = sweep_noise.check_dir("%s/Channel_%02d/" % (saveDirPINResponse,channel))
 
