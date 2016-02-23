@@ -45,13 +45,12 @@ if __name__=="__main__":
     ###########################################
     scope_channels = [1,3] # We're using channel 1 and 3 (1 for PMT 3 for probe point)!
     termination = [50,1e6] # Ohms
-    trigger_level = 0.5 # half peak minimum
+    trigger_level = -0.03 # 
     falling_edge = True
-    min_trigger = -0.004
-    y_div_units = [1,0.02] # volts
-    x_div_units = 20e-9 # seconds
+    y_div_units = [0.02,0.02] # volts
+    x_div_units = 4e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
-    record_length = 1e3 # trace is 100e3 samples long
+    record_length = 10e3 # trace is 100e3 samples long
     half_length = record_length / 2 # For selecting region about trigger point
     ###########################################
     scope.unlock()
@@ -61,8 +60,8 @@ if __name__=="__main__":
     scope.set_record_length(record_length)
     scope.set_active_channel(1)
     scope.set_active_channel(3)
-    scope.set_data_mode(half_length-50, half_length+50)
-    #scope.set_edge_trigger(trigger, 1, True) # Rising edge trigger 
+    scope.set_data_mode(half_length-1500, half_length+50)
+    scope.set_edge_trigger(trigger_level, 1 , True) # Rising edge trigger 
     y_offset = [-2.5*y_div_units[0],0.05]
     
     for i in range(len(scope_channels)):
@@ -104,6 +103,11 @@ if __name__=="__main__":
             saveDirs[0] = output_dirname_pmt
             saveDirs[1] = output_dirname_noise
             print saveDirs 
+            print box
+            print channel
+	    print ipw
+	    print delay
+            print scope
             pin,rms = sweep_noise.sweep_noise(saveDirs,box,channel,ipw,delay,scope)
             pinFile = open(output_filename_pin,"w")
             pinFile.write("%s %s\n" % (pin,rms))

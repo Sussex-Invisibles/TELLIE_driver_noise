@@ -192,33 +192,33 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     sc.set_pulse_delay(delay)
     sc.set_fibre_delay(fibre_delay)
     sc.set_trigger_delay(trigger_delay)
-    
+    print "Set up TELLIE" 
     # first, run a single acquisition with a forced trigger, effectively to clear the waveform
     scope._connection.send("trigger:state ready")
     time.sleep(0.1)
     scope._connection.send("trigger force")
     time.sleep(0.1)
-
+    print "Reset Scope"
     # File system stuff
     fname0 = "%sWidth%05d" % (dirs_out[0],width)
     fname1 = "%sWidth%05d" % (dirs_out[1],width)
     
+    print "Set up Files" 
     # Check scope
-    ck = find_and_set_scope_y_scale(1,height,width,delay,scope,scaleGuess=min_volt)
-    if ck == True:
-        print "Saving raw pmt  files to: %s..." % fname0
-        print "Saving raw probe  files to: %s..." % fname1
-        sc.fire_sequence()
-        save_ck0 = save_scopeTraces(fname0, scope, 1, 100)
-        save_ck1 = save_scopeTraces(fname1, scope, 3, 100)
-	#sleeping for 5 seconds to ensure TELLIE has stopped pulsing
-	time.sleep(5)
-    	pin = None
-   	# while not comms_flags.valid_pin(pin,channel):
-    	while pin==None:
-	    pin,rms,chans = sc.tmp_read_rms()
+    print "Saving raw pmt  files to: %s..." % fname0
+    print "Saving raw probe  files to: %s..." % fname1
+    sc.fire_sequence()
+    print "Fired TELLIE"
+    save_ck0 = save_scopeTraces(fname0, scope, 1, 100)
+    save_ck1 = save_scopeTraces(fname1, scope, 3, 100)
+    print "Saved scope traces"
+    #sleeping for 5 seconds to ensure TELLIE has stopped pulsing
+    time.sleep(5)
+    pin = None
+    # while not comms_flags.valid_pin(pin,channel):
+    while pin==None:
+        pin,rms,chans = sc.tmp_read_rms()
+        print pin
+        print chans
+    return pin[logical_channel],rms[logical_channel]
 
-        return pin[logical_channel],rms[logical_channel]
-
-    else:
-        return 0
