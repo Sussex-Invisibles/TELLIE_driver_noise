@@ -48,7 +48,7 @@ if __name__=="__main__":
     trigger_level = -0.03 # 
     falling_edge = True
     y_div_units = [0.02,0.02] # volts
-    x_div_units = 4e-9 # seconds
+    x_div_units = 1e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
     record_length = 10e3 # trace is 100e3 samples long
     half_length = record_length / 2 # For selecting region about trigger point
@@ -60,7 +60,7 @@ if __name__=="__main__":
     scope.set_record_length(record_length)
     scope.set_active_channel(1)
     scope.set_active_channel(3)
-    scope.set_data_mode(half_length-1500, half_length+50)
+    scope.set_data_mode(half_length-15000, half_length+500)
     scope.set_edge_trigger(trigger_level, 1 , True) # Rising edge trigger 
     y_offset = [-2.5*y_div_units[0],0.05]
     

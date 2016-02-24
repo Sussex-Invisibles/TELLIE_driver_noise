@@ -95,6 +95,40 @@ def save_scopeTraces(fileName, scope, channel, noPulses):
     results.close()
     return True
 
+def save_scopeTraces_Multiple(fileNames, scope, channels, noPulses):
+    """Save a number of scope traces to file - uses compressed .pkl"""
+    results = []
+    for i in range(len(fileNames)):
+	    scope._get_preamble(channels[i])
+	    results.append(utils.PickleFile(fileNames[i], 1))
+	    results[i].add_meta_data("timeform_1", scope.get_timeform(channels[i]))
+
+    #ct = scope.acquire_time_check()
+    #if ct == False:
+    #    print 'No triggers for this data point. Will skip and set data to 0.'
+    #    results.save()
+    #    results.close()
+    #    return False
+
+    t_start, loopStart = time.time(),time.time()
+    for i in range(noPulses):
+        try:
+            ct = scope.acquire_time_check(timeout=.4)
+            for j in range(len(results)):
+		    results[j].add_data(scope.get_waveform(channels[j]), 1)
+        except Exception, e:
+            print "Scope died, acquisition lost."
+            print e
+        if i % 100 == 0 and i > 0:
+            print "%d traces collected - This loop took : %1.1f s" % (i, time.time()-loopStart)
+            loopStart = time.time()
+    print "%d traces collected TOTAL - took : %1.1f s" % (i, (time.time()-t_start))
+    for i in range(len(results)):
+	    results[i].save()
+	    results[i].close()
+    return True
+
+
 def find_and_set_scope_y_scale(channel,height,width,delay,scope,scaleGuess=None):
     """Finds best y_scaling for current pulses
     """
@@ -209,8 +243,11 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     print "Saving raw probe  files to: %s..." % fname1
     sc.fire_sequence()
     print "Fired TELLIE"
-    save_ck0 = save_scopeTraces(fname0, scope, 1, 100)
-    save_ck1 = save_scopeTraces(fname1, scope, 3, 100)
+    fileNames = [fname0,fname1]
+    channels = [1,3]
+    saved = save_scopeTraces_Multiple(fileNames,scope,channels,100)
+    #save_ck0 = save_scopeTraces(fname0, scope, 1, 100)
+    #save_ck1 = save_scopeTraces(fname1, scope, 3, 100)
     print "Saved scope traces"
     #sleeping for 5 seconds to ensure TELLIE has stopped pulsing
     time.sleep(5)
