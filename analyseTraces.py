@@ -28,6 +28,11 @@ def get_gain(applied_volts):
     gain = a*np.exp(b*applied_volts) + c
     return gain
 
+def calcAreaSingle(x,y):
+    """Calc area of pulses"""
+    area  = np.trapz(y,x)
+    return area
+
 def readPinFile(inFile):
     pinVal = 0 
     pinRMS = 0
@@ -46,9 +51,9 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces):
         max_pmt_index = np.argmax(np.fabs(pmt_traces[i]))
         max_noise_index = np.argmax(np.fabs(noise_traces[i]))
         TimeGapVals.append(np.fabs(time_trace[max_pmt_index]-time_trace[max_noise_index]))
-    timeGapHisto = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeak","TimeDifferencebetweennoiseandPMTPeak",20,np.amin(TimeGapVals)-1e-8,np.amax(TimeGapVals)+1e-8)
+    timeGapHisto = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeak","TimeDifferencebetweennoiseandPMTPeak",100,(np.amin(TimeGapVals)-1e-8)*1e9,(np.amax(TimeGapVals)+1e-8)*1e9)
     for timeGapVal in TimeGapVals:
-        timeGapHisto.Fill(float(timeGapVal))
+        timeGapHisto.Fill(float(timeGapVal)*1e9)
     return timeGapHisto
 
 if __name__=="__main__":
@@ -75,15 +80,26 @@ if __name__=="__main__":
     noise_traces = []
 
     for pmt_file in os.listdir(pmt_dir):
-        x1,y1 = calc.readPickleChannel(os.path.join(pmt_dir,pmt_file), 1,False)
+        x1 = None
+        y1 = None
+        try:
+            x1,y1 = calc.readPickleChannel(os.path.join(pmt_dir,pmt_file), 1,False)
+        except:
+            continue
 	if not got_time_trace:
 	    time_trace = x1
-
-        pmt_traces.append(np.mean(y1,0))
+        for i in range(len(y1)):
+            pmt_traces.append(y1[i])
 
     for noise_file in os.listdir(noise_dir):
-        x1,y1 = calc.readPickleChannel(os.path.join(noise_dir,noise_file), 1,False)
-        noise_traces.append(np.mean(y1,0))
+        x1 = None
+        y1 = None
+        try:
+            x1,y1 = calc.readPickleChannel(os.path.join(pmt_dir,pmt_file), 1,False)
+        except:
+            continue
+        for i in range(len(y1)):
+            noise_traces.append(y1[i])
     
     for pin_file in os.listdir(pin_dir):
         pin,rms = readPinFile(os.path.join(pin_dir,pin_file))
@@ -103,18 +119,32 @@ if __name__=="__main__":
         pinRMSHisto.Fill(pinRMS)
     
     #Getting photon count from area under peak
-    photonCounts  = []
+    photonCountsAverage  = []
+    photonCounts = []
     photonRMS = []
     for pmt_file in os.listdir(pmt_dir):
-        x1,y1 = calc.readPickleChannel(os.path.join(pmt_dir,pmt_file), 1,True)
-        num_photons =  get_photons(calc.calcArea(x1,y1),0.7)
-        photonCounts.append(num_photons[0])
-        photonRMS.append(num_photons[1])
+        x1 = None
+        y1 = None
+        try:
+            x1,y1 = calc.readPickleChannel(os.path.join(pmt_dir,pmt_file), 1,True)
+        except:
+            continue
+        for i in range(len(y1)):
+            photonCounts.append(get_photons(calcAreaSingle(x1,y1[i]),0.7))
+        
+        num_photons_average_rms =  get_photons(calc.calcArea(x1,y1),0.7)
+        photonCountsAverage.append(num_photons_average_rms[0])
+        photonRMS.append(num_photons_average_rms[1])
     
-    photonHisto = ROOT.TH1D("PhotonCount","PhotonCount",20,np.amin(photonCounts)-10,np.amax(photonCounts)+10)
+    photonHistoAverage = ROOT.TH1D("PhotonCountAverage","PhotonCountAverage",20,np.amin(photonCountsAverage)-10,np.amax(photonCountsAverage)+10)
+    photonHistoSingle = ROOT.TH1D("PhotonCountSingle","PhotonCountSingle",100,np.amin(photonCounts)-10,np.amax(photonCounts)+10)
     photonHistoRMS = ROOT.TH1D("PhotonCountRMS","PhotonCountRMS",20,np.amin(photonRMS)-10,np.amax(photonRMS)+10)
-    for photonVal in photonCounts:
-       photonHisto.Fill(photonVal)
+   
+    for photonSingleVal in photonCounts:
+        photonHistoSingle.Fill(photonSingleVal) 
+
+    for photonVal in photonCountsAverage:
+       photonHistoAverage.Fill(photonVal)
     
     for photonRMSVal in photonRMS:
        photonHistoRMS.Fill(photonRMSVal)
@@ -125,10 +155,18 @@ if __name__=="__main__":
     
     timeGapHisto.Write()
 
-    photonHisto.Write()
+    photonHistoSingle.Write()
+    
+    photonHistoAverage.Write()
    
     photonHistoRMS.Write()
 
     outRoot.Close()
-
+    
+     
+    plt.figure(0)
+    plt.errorbar(pin_vals,photonCountsAverage,yerr=photonRMS,linestyle="",fmt="o")
+    plt.xlabel("PIN Reading")
+    plt.ylabel("Photon Count")
+    plt.show()
    

@@ -17,8 +17,8 @@ if __name__ == "__main__":
     y2mean = np.mean(y2,0)
 
     plt.figure(0)
-    plt.plot(x1,y1mean,label=fileName1,False)
-    plt.plot(x1,y2mean,label=fileName2,False)
+    plt.plot(x1,y1mean,label=fileName1)
+    plt.plot(x1,y2mean,label=fileName2)
     plt.legend(loc = "upper right")
     plt.show()
     
