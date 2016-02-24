@@ -44,8 +44,15 @@ def readPinFile(inFile):
         break
     return pinVal, pinRMS
 
+def getThresholdCrossing(x,y,limit):
+    max_val = amax(y)
+    for i in range(len(y)):
+        if y[i] > max_val*limit:
+            y[i] = upper_lim
+            y[i-1] = lower_lim
 
-def createTimeGapHisto(time_trace,pmt_traces,noise_traces):
+
+def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_level):
     TimeGapVals = []
     for i in range(len(pmt_traces)):
         max_pmt_index = np.argmax(np.fabs(pmt_traces[i]))
