@@ -65,8 +65,8 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     TimeGapVals = []
     noiseCrossIndex = []
     for i in range(len(pmt_traces)):
-        pmt_pulse_time = calc.interpolate_threshold(time_trace,np.fabs(pmt_traces[i]),0.1*np.amax(np.fabs(pmt_traces[i])))*1e9
-        #driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amax(np.fabs(noise_traces[i])))*1e9
+        pmt_pulse_time = calc.interpolate_threshold(time_trace,np.fabs(pmt_traces[i]),0.2*np.amax(np.fabs(pmt_traces[i])))*1e9
+        #driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amin(noise_traces[i]))*1e9
         driver_noise_time = calcPeakRisePoint(time_trace,noise_traces[i],noise_threshold)*1e9
 
         if not np.isfinite(driver_noise_time) or not np.isfinite(pmt_pulse_time):
@@ -85,11 +85,11 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     plt.ylabel("Ground Noise Voltage (V)")
     for i in range(len(noiseCrossIndex)):
         noise_trace = noise_traces[i]
-        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]:]-time_trace[noiseCrossIndex[i]],1e9),noise_trace[noiseCrossIndex[i]:],label="Trace: "+str(i))
+        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]-150:]-time_trace[noiseCrossIndex[i]-150],1e9),noise_trace[noiseCrossIndex[i]-150:],label="Trace: "+str(i))
     plt.subplot(212)
     for i in range(len(noiseCrossIndex)):
         pmt_trace = pmt_traces[i]
-        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]:]-time_trace[noiseCrossIndex[i]],1e9),pmt_trace[noiseCrossIndex[i]:],label="Trace: "+str(i))
+        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]-150:]-time_trace[noiseCrossIndex[i]-150],1e9),pmt_trace[noiseCrossIndex[i]-150:],label="Trace: "+str(i))
     plt.ylabel("PMT Pulse")
     plt.xlabel("Time (ns)")
     plt.subplot(211)
@@ -201,7 +201,7 @@ if __name__=="__main__":
 
     pinRMSHisto.Write()
 
-    timeGapHisto = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.4)
+    timeGapHisto = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.1)
     
     timeGapHisto.Write()
 
@@ -216,7 +216,7 @@ if __name__=="__main__":
      
     plt.figure(0)
     plt.errorbar(pin_vals,photonCountsAverage,yerr=np.divide(photonRMS,np.sqrt(numReadings)),xerr=np.divide(pin_rms,np.sqrt(npulses)),linestyle="",fmt="")
-    plt.scatter(pin_vals,photonCountsAverage,s=(1,(len(pin_vals))+1))
+    plt.scatter(pin_vals,photonCountsAverage,s=5*range(1,(len(pin_vals))+1))
     plt.xlabel("PIN Reading")
     plt.ylabel("Photon Count")
     plt.savefig("root_files/Box_%02d/Channel_%02d/PhotonVsPin.png"%(box,channel))
