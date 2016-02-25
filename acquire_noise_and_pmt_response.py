@@ -44,24 +44,25 @@ if __name__=="__main__":
     scope = scopes.Tektronix3000(usb_conn)
     ###########################################
     scope_channels = [1,3,2] # We're using channel 1 and 3 (1 for PMT 3 for probe point and 2 for the trigger signal)!
-    termination = [50,1e6,1e6] # Ohms
-    trigger_level = 0.074 # 
+    termination = [50,1e6,50] # Ohms
+    trigger_level = 1.4 # 
     falling_edge = True
-    y_div_units = [0.02,0.05,0.02] # volts
-    x_div_units = 1e-9 # seconds
+    y_div_units = [0.02,0.2,1.0] # volts
+    x_div_units = 100e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
     record_length = 10e3 # trace is 100e3 samples long
     half_length = record_length / 2 # For selecting region about trigger point
     ###########################################
     scope.unlock()
     scope.set_horizontal_scale(x_div_units)
+    scope.set_sample_rate(2.5e9)
     scope.set_horizontal_delay(x_offset) #shift to the left 2 units
     scope.set_single_acquisition() # Single signal acquisition mode
     scope.set_record_length(record_length)
     scope.set_active_channel(1)
     scope.set_active_channel(3)
     scope.set_active_channel(2)
-    scope.set_data_mode(half_length-500, half_length+1500)
+    scope.set_data_mode(half_length-2500, half_length+900)
     scope.set_edge_trigger(trigger_level, 2 , falling=False) # Rising edge trigger 
     y_offset = [-2.5*y_div_units[0],0.05,0]
     

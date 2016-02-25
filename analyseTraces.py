@@ -4,8 +4,15 @@ import optparse
 import calc_utils as calc
 import numpy as np
 import matplotlib.pyplot as plt
-import sweep_noise
 import ROOT
+
+def check_dir(dname):
+    """Check if directory exists, create it if it doesn't"""
+    direc = os.path.dirname(dname)
+    if not os.path.exists(direc):
+        print os.makedirs(direc)
+        print "Made directory %s...." % dname
+    return dname    
 
 def get_photons(volts_seconds,applied_volts):
     """Use the integral (Vs) from the scope to get the number of photons.
@@ -47,14 +54,21 @@ def readPinFile(inFile):
         break
     return npulses, pinVal, pinRMS
 
-
+def calcPeakRisePoint(x,y,thresh):
+    max_index = np.argmin(y)
+    max_val = np.fabs(y[max_index])
+    for i in range(max_index,0,-1):
+        if np.fabs(y[i]) < max_val*thresh:
+           return x[i]
 
 def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     TimeGapVals = []
     noiseCrossIndex = []
     for i in range(len(pmt_traces)):
         pmt_pulse_time = calc.interpolate_threshold(time_trace,np.fabs(pmt_traces[i]),0.1*np.amax(np.fabs(pmt_traces[i])))*1e9
-        driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amax(np.fabs(noise_traces[i])))*1e9
+        #driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amax(np.fabs(noise_traces[i])))*1e9
+        driver_noise_time = calcPeakRisePoint(time_trace,noise_traces[i],noise_threshold)*1e9
+
         if not np.isfinite(driver_noise_time) or not np.isfinite(pmt_pulse_time):
             continue
 	for j in range(len(time_trace)):
@@ -67,11 +81,20 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
         timeGapHisto.Fill(float(timeGapVal))
     
     plt.figure(1)
-    plt.xlabel("Time (ns)")
+    plt.subplot(211)
     plt.ylabel("Ground Noise Voltage (V)")
     for i in range(len(noiseCrossIndex)):
         noise_trace = noise_traces[i]
         plt.plot(np.multiply(time_trace[noiseCrossIndex[i]:]-time_trace[noiseCrossIndex[i]],1e9),noise_trace[noiseCrossIndex[i]:],label="Trace: "+str(i))
+    plt.subplot(212)
+    for i in range(len(noiseCrossIndex)):
+        pmt_trace = pmt_traces[i]
+        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]:]-time_trace[noiseCrossIndex[i]],1e9),pmt_trace[noiseCrossIndex[i]:],label="Trace: "+str(i))
+    plt.ylabel("PMT Pulse")
+    plt.xlabel("Time (ns)")
+    plt.subplot(211)
+    ax = plt.gca()
+    ax.set_xticklabels([])
     
 
     
@@ -124,12 +147,13 @@ if __name__=="__main__":
             noise_traces.append(y1[i])
     
     for pin_file in os.listdir(pin_dir):
+        print pin_file
         numPulses,pin,rms = readPinFile(os.path.join(pin_dir,pin_file))
         pin_vals.append(pin)
         pin_rms.append(rms)
         npulses.append(numPulses)
-    sweep_noise.check_dir("root_files/Box%02d"%(box))
-    sweep_noise.check_dir("root_files/Box_%02d/Channel_%02d/"%(box,channel))
+    check_dir("root_files/Box%02d"%(box))
+    check_dir("root_files/Box_%02d/Channel_%02d/"%(box,channel))
     outRoot = ROOT.TFile("root_files/Box_%02d/Channel_%02d/histos.root" %(box,channel),"RECREATE") 
     
     pinHisto = ROOT.TH1D("PinValues","PinValues",int(np.amax(pin_vals)-np.amin(pin_vals))+4,np.amin(pin_vals)-1,np.amax(pin_vals)+1)
@@ -191,7 +215,8 @@ if __name__=="__main__":
     
      
     plt.figure(0)
-    plt.errorbar(pin_vals,photonCountsAverage,yerr=np.divide(photonRMS,np.sqrt(numReadings)),xerr=np.divide(pin_rms,np.sqrt(npulses)),linestyle="",fmt="o")
+    plt.errorbar(pin_vals,photonCountsAverage,yerr=np.divide(photonRMS,np.sqrt(numReadings)),xerr=np.divide(pin_rms,np.sqrt(npulses)),linestyle="",fmt="")
+    plt.scatter(pin_vals,photonCountsAverage,s=(1,(len(pin_vals))+1))
     plt.xlabel("PIN Reading")
     plt.ylabel("Photon Count")
     plt.savefig("root_files/Box_%02d/Channel_%02d/PhotonVsPin.png"%(box,channel))
