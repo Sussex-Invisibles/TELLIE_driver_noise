@@ -45,9 +45,9 @@ if __name__=="__main__":
     ###########################################
     scope_channels = [1,3,2] # We're using channel 1 and 3 (1 for PMT 3 for probe point and 2 for the trigger signal)!
     termination = [50,1e6,1e6] # Ohms
-    trigger_level = 0.05 # 
+    trigger_level = 0.074 # 
     falling_edge = True
-    y_div_units = [0.02,0.02,0.02] # volts
+    y_div_units = [0.02,0.05,0.02] # volts
     x_div_units = 1e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
     record_length = 10e3 # trace is 100e3 samples long
@@ -109,9 +109,9 @@ if __name__=="__main__":
 	    print ipw
 	    print delay
             print scope
-            pin,rms = sweep_noise.sweep_noise(saveDirs,box,channel,ipw,delay,scope)
+            npulses,pin,rms = sweep_noise.sweep_noise(saveDirs,box,channel,ipw,delay,scope)
             pinFile = open(output_filename_pin,"w")
-            pinFile.write("%s %s\n" % (pin,rms))
+            pinFile.write("%s %s %s\n" % (npulses,pin,rms))
             pinFile.close()
             
             

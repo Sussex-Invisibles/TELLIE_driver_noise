@@ -4,6 +4,7 @@ import optparse
 import calc_utils as calc
 import numpy as np
 import matplotlib.pyplot as plt
+import sweep_noise
 import ROOT
 
 def get_photons(volts_seconds,applied_volts):
@@ -34,33 +35,46 @@ def calcAreaSingle(x,y):
     return area
 
 def readPinFile(inFile):
+    npulses = 0
     pinVal = 0 
     pinRMS = 0
     input = open(inFile,"r")
     for line in input:
         vals = line.split()
-        pinVal = float(vals[0])
-        pinRMS = float(vals[1])
+        npulses = float(vals[0])
+        pinVal = float(vals[1])
+        pinRMS = float(vals[2])
         break
-    return pinVal, pinRMS
-
-def getThresholdCrossing(x,y,limit):
-    max_val = amax(y)
-    for i in range(len(y)):
-        if y[i] > max_val*limit:
-            y[i] = upper_lim
-            y[i-1] = lower_lim
+    return npulses, pinVal, pinRMS
 
 
-def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_level):
+
+def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     TimeGapVals = []
+    noiseCrossIndex = []
     for i in range(len(pmt_traces)):
-        max_pmt_index = np.argmax(np.fabs(pmt_traces[i]))
-        max_noise_index = np.argmax(np.fabs(noise_traces[i]))
-        TimeGapVals.append(np.fabs(time_trace[max_pmt_index]-time_trace[max_noise_index]))
-    timeGapHisto = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeak","TimeDifferencebetweennoiseandPMTPeak",100,(np.amin(TimeGapVals)-1e-8)*1e9,(np.amax(TimeGapVals)+1e-8)*1e9)
+        pmt_pulse_time = calc.interpolate_threshold(time_trace,np.fabs(pmt_traces[i]),0.1*np.amax(np.fabs(pmt_traces[i])))*1e9
+        driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amax(np.fabs(noise_traces[i])))*1e9
+        if not np.isfinite(driver_noise_time) or not np.isfinite(pmt_pulse_time):
+            continue
+	for j in range(len(time_trace)):
+	    if time_trace[j]*1e9 > driver_noise_time:
+	       noiseCrossIndex.append(j)
+	       break
+        TimeGapVals.append(np.fabs(pmt_pulse_time-driver_noise_time))
+    timeGapHisto = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeak","TimeDifferencebetweennoiseandPMTPeak",100,(np.amin(TimeGapVals)-10),(np.amax(TimeGapVals)+10))
     for timeGapVal in TimeGapVals:
-        timeGapHisto.Fill(float(timeGapVal)*1e9)
+        timeGapHisto.Fill(float(timeGapVal))
+    
+    plt.figure(1)
+    plt.xlabel("Time (ns)")
+    plt.ylabel("Ground Noise Voltage (V)")
+    for i in range(len(noiseCrossIndex)):
+        noise_trace = noise_traces[i]
+        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]:]-time_trace[noiseCrossIndex[i]],1e9),noise_trace[noiseCrossIndex[i]:],label="Trace: "+str(i))
+    
+
+    
     return timeGapHisto
 
 if __name__=="__main__":
@@ -85,6 +99,7 @@ if __name__=="__main__":
     pin_vals = []
     pin_rms = []
     noise_traces = []
+    npulses = []
 
     for pmt_file in os.listdir(pmt_dir):
         x1 = None
@@ -102,18 +117,20 @@ if __name__=="__main__":
         x1 = None
         y1 = None
         try:
-            x1,y1 = calc.readPickleChannel(os.path.join(pmt_dir,pmt_file), 1,False)
+            x1,y1 = calc.readPickleChannel(os.path.join(noise_dir,noise_file), 1,False)
         except:
             continue
         for i in range(len(y1)):
             noise_traces.append(y1[i])
     
     for pin_file in os.listdir(pin_dir):
-        pin,rms = readPinFile(os.path.join(pin_dir,pin_file))
+        numPulses,pin,rms = readPinFile(os.path.join(pin_dir,pin_file))
         pin_vals.append(pin)
         pin_rms.append(rms)
-       
-    outRoot = ROOT.TFile("root_files/driver_noiseBox_%02d_Chan_%02d.root" %(box,channel),"RECREATE") 
+        npulses.append(numPulses)
+    sweep_noise.check_dir("root_files/Box%02d"%(box))
+    sweep_noise.check_dir("root_files/Box_%02d/Channel_%02d/"%(box,channel))
+    outRoot = ROOT.TFile("root_files/Box_%02d/Channel_%02d/histos.root" %(box,channel),"RECREATE") 
     
     pinHisto = ROOT.TH1D("PinValues","PinValues",int(np.amax(pin_vals)-np.amin(pin_vals))+4,np.amin(pin_vals)-1,np.amax(pin_vals)+1)
     for pinVal in pin_vals:
@@ -127,6 +144,7 @@ if __name__=="__main__":
     
     #Getting photon count from area under peak
     photonCountsAverage  = []
+    numReadings = []
     photonCounts = []
     photonRMS = []
     for pmt_file in os.listdir(pmt_dir):
@@ -139,6 +157,7 @@ if __name__=="__main__":
         for i in range(len(y1)):
             photonCounts.append(get_photons(calcAreaSingle(x1,y1[i]),0.7))
         
+        numReadings.append(len(y1))
         num_photons_average_rms =  get_photons(calc.calcArea(x1,y1),0.7)
         photonCountsAverage.append(num_photons_average_rms[0])
         photonRMS.append(num_photons_average_rms[1])
@@ -158,7 +177,7 @@ if __name__=="__main__":
 
     pinRMSHisto.Write()
 
-    timeGapHisto = createTimeGapHisto(time_trace,pmt_traces,noise_traces)
+    timeGapHisto = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.4)
     
     timeGapHisto.Write()
 
@@ -172,8 +191,10 @@ if __name__=="__main__":
     
      
     plt.figure(0)
-    plt.errorbar(pin_vals,photonCountsAverage,yerr=photonRMS,linestyle="",fmt="o")
+    plt.errorbar(pin_vals,photonCountsAverage,yerr=np.divide(photonRMS,np.sqrt(numReadings)),xerr=np.divide(pin_rms,np.sqrt(npulses)),linestyle="",fmt="o")
     plt.xlabel("PIN Reading")
     plt.ylabel("Photon Count")
-    plt.show()
+    plt.savefig("root_files/Box_%02d/Channel_%02d/PhotonVsPin.png"%(box,channel))
+    plt.figure(1)
+    plt.savefig("root_files/Box_%02d/Channel_%02d/envelope.png"%(box,channel))
    

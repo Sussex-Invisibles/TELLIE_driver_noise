@@ -257,5 +257,5 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
         pin,rms,chans = sc.tmp_read_rms()
         print pin
         print chans
-    return pin[logical_channel],rms[logical_channel]
+    return pulse_number,pin[logical_channel],rms[logical_channel]
 
