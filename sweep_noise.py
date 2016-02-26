@@ -198,7 +198,6 @@ def find_and_set_scope_y_scale(channel,height,width,delay,scope,scaleGuess=None)
         trig = -1.*scale
     print "Preticted scale = %1.3fV, actual scale = %1.3fV, trigger @ %1.4fV" % (-1*(min_volt/6.6) , scale, trig)
     scope.set_channel_y( channel, scale, pos=3) # set scale, starting with largest
-    scope.set_edge_trigger( trig, channel, falling=True)
 
     print "TOTAL FUNC TIME = %1.2f s" % (time.time() - func_time)
     sc.stop()
@@ -218,7 +217,6 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     pulse_number = 11100
     #first select the correct channel and provide settings
     logical_channel = (box-1)*8 + channel
-    
     sc.select_channel(logical_channel)
     sc.set_pulse_width(width)
     sc.set_pulse_height(16383)
@@ -226,6 +224,8 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     sc.set_pulse_delay(delay)
     sc.set_fibre_delay(fibre_delay)
     sc.set_trigger_delay(trigger_delay)
+    ck =find_and_set_scope_y_scale(1,height,width,0,scope,0.05)
+    scope.set_edge_trigger(1.4, 2 , falling=False) # Rising edge trigger 
     print "Set up TELLIE" 
     # first, run a single acquisition with a forced trigger, effectively to clear the waveform
     scope._connection.send("trigger:state ready")
@@ -244,7 +244,7 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     sc.fire_sequence()
     print "Fired TELLIE"
     fileNames = [fname0,fname1]
-    channels = [1,3]
+    channels = [1,4]
     saved = save_scopeTraces_Multiple(fileNames,scope,channels,100)
     #save_ck0 = save_scopeTraces(fname0, scope, 1, 100)
     #save_ck1 = save_scopeTraces(fname1, scope, 3, 100)
