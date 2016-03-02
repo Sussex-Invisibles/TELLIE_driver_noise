@@ -224,7 +224,7 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     sc.set_pulse_delay(delay)
     sc.set_fibre_delay(fibre_delay)
     sc.set_trigger_delay(trigger_delay)
-    ck =find_and_set_scope_y_scale(1,height,width,0,scope,0.05)
+    ck =find_and_set_scope_y_scale(1,height,width,0,scope,0.2)
     scope.set_edge_trigger(1.4, 2 , falling=False) # Rising edge trigger 
     print "Set up TELLIE" 
     # first, run a single acquisition with a forced trigger, effectively to clear the waveform

@@ -77,9 +77,9 @@ if __name__=="__main__":
 
 
     #Create a new, timestamped, summary file
-    saveDirNoise = sweep_noise.check_dir('./driver_noise')
-    saveDirPMTResponse = sweep_noise.check_dir("./pmt_response")
-    saveDirPINResponse = sweep_noise.check_dir("./pin_response")
+    saveDirNoise = sweep_noise.check_dir('./tenTimesIntensity/driver_noise')
+    saveDirPMTResponse = sweep_noise.check_dir("./tenTimesIntensity/pmt_response")
+    saveDirPINResponse = sweep_noise.check_dir("./tenTimesIntensity/pin_response")
 
     saveDirNoise = sweep_noise.check_dir("%s/Box_%02d" % (saveDirNoise,box))
     saveDirPMTResponse =  sweep_noise.check_dir("%s/Box_%02d" % (saveDirPMTResponse,box))

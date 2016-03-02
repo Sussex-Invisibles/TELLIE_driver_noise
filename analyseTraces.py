@@ -75,6 +75,11 @@ def getPosThresholdCrossing(x,y,thresh):
 def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     TimeGapVals = []
     noiseCrossIndex = []
+    meanOffset = []
+    meanOffsetError = []
+    offsetFWHM = []
+    offsetFWHMError = []
+    timeGapValsSingle = []
     for i in range(len(pmt_traces)):
         pmt_pulse_time = calcPeakRisePoint(time_trace,pmt_traces[i],0.2)*1e9
         #driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amin(noise_traces[i]))*1e9
@@ -85,10 +90,25 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
         if not np.isfinite(driver_noise_time) or not np.isfinite(pmt_pulse_time):
             continue
         TimeGapVals.append(np.fabs(pmt_pulse_time-driver_noise_time))
+        timeGapValsSingle.append(np.fabs(pmt_pulse_time-driver_noise_time))
         for j in range(len(time_trace)):
             if time_trace[j]*1e9 > driver_noise_time:
                 noiseCrossIndex.append(j)
                 break
+        if (i+1)%100 == 0:        
+ 	    timeGapHistoSingle = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeakSingleReading","TimeDifferencebetweennoiseandPMTPeakSingleReading",50,(np.amin(timeGapValsSingle)-10),(np.amax(timeGapValsSingle)+10))
+	    for timeGapVal in timeGapValsSingle:
+	       timeGapHistoSingle.Fill(timeGapVal)
+	    timeGapHistoSingle.Fit("gaus")
+	    meanOffset.append(timeGapHistoSingle.GetFunction("gaus").GetParameter(1))
+	    meanOffsetError.append(timeGapHistoSingle.GetFunction("gaus").GetParError(1))
+	    offsetFWHM.append(timeGapHistoSingle.GetFunction("gaus").GetParameter(2)*2.35482)
+	    offsetFWHMError.append(timeGapHistoSingle.GetFunction("gaus").GetParError(2)*2.35482)
+            #Emptying array
+            timeGapValsSingle = []
+        
+    
+
     timeGapHisto = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeak","TimeDifferencebetweennoiseandPMTPeak",50,(np.amin(TimeGapVals)-10),(np.amax(TimeGapVals)+10))
     for timeGapVal in TimeGapVals:
         timeGapHisto.Fill(float(timeGapVal))
@@ -128,7 +148,7 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     ax.set_xticklabels([])
     
     
-    return timeGapHisto 
+    return timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError
 
 if __name__=="__main__":
     parser = optparse.OptionParser()
@@ -177,6 +197,8 @@ if __name__=="__main__":
     posPeakNoiseError = []
     negPeakNoiseAvg = []
     negPeakNoiseError = []
+    
+
     for noise_file in os.listdir(noise_dir):
         x1 = None
         y1 = None
@@ -269,6 +291,7 @@ if __name__=="__main__":
     photonHistoAverage = ROOT.TH1D("PhotonCountAverage","PhotonCountAverage",20,np.amin(photonCountsAverage)-10,np.amax(photonCountsAverage)+10)
     photonHistoSingle = ROOT.TH1D("PhotonCountSingle","PhotonCountSingle",100,np.amin(photonCounts)-10,np.amax(photonCounts)+10)
     photonHistoRMS = ROOT.TH1D("PhotonCountRMS","PhotonCountRMS",20,np.amin(photonRMS)-10,np.amax(photonRMS)+10)
+    
    
     posNoiseVsPhoton = ROOT.TH2D("MaximumNoiseVoltageVsPhotonCount","MaximumNoiseVoltageVsPhotonCount",15,np.amin(posPeakNoiseTotal)-.01,np.amax(posPeakNoiseTotal)+.01,75,np.amin(photonCounts)-100,np.amax(photonCounts)+100) 
     negNoiseVsPhoton = ROOT.TH2D("MaximumNegativeNoiseVoltageVsPhotonCount","MaximumNegativeNoiseVoltageVsPhotonCount",15,np.amin(negPeakNoiseTotal)-.01,np.amax(negPeakNoiseTotal)+.01,75,np.amin(photonCounts)-100,np.amax(photonCounts)+100) 
@@ -287,7 +310,8 @@ if __name__=="__main__":
 
     pinRMSHisto.Write()
 
-    timeGapHisto  = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.1)
+    timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError  = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.1)
+    
     
     timeGapHisto.Write()
     
@@ -348,3 +372,18 @@ if __name__=="__main__":
     plt.errorbar(readingsCount,negPeakNoiseAvg,yerr=negPeakNoiseError,linestyle="")
     plt.savefig("root_files/Box_%02d/Channel_%02d/readingResults.png"%(box,channel))
 
+    print "Len mean offset: "+str(len(meanOffset))
+    print "Len mean offset error: "+str(len(meanOffsetError))
+    plt.figure(7)
+    plt.xlabel("Reading Number")
+    plt.ylabel("Mean Time Offset (ns)")
+    plt.errorbar(readingsCount,meanOffset,yerr=meanOffsetError)
+    plt.savefig("root_files/Box_%02d/Channel_%02d/readingMeanOffset.png"%(box,channel))
+    
+    print "Len mean offset FWHM: "+str(len(offsetFWHM))
+    print "Len mean offset FWHM error: "+str(len(offsetFWHMError))
+    plt.figure(8)
+    plt.xlabel("Reading Number")
+    plt.ylabel("Time Offset FWHM (ns)")
+    plt.errorbar(readingsCount,offsetFWHM,yerr=offsetFWHMError)
+    plt.savefig("root_files/Box_%02d/Channel_%02d/OffsetFWHM.png"%(box,channel))
