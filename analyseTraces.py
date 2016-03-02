@@ -74,9 +74,7 @@ def getPosThresholdCrossing(x,y,thresh):
 
 def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     TimeGapVals = []
-    TimeGapValsInteresting = []
     noiseCrossIndex = []
-    noiseCrossIndexInteresting = []
     for i in range(len(pmt_traces)):
         pmt_pulse_time = calcPeakRisePoint(time_trace,pmt_traces[i],0.2)*1e9
         #driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amin(noise_traces[i]))*1e9
@@ -86,27 +84,15 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
 
         if not np.isfinite(driver_noise_time) or not np.isfinite(pmt_pulse_time):
             continue
-        if (np.fabs(pmt_pulse_time-driver_noise_time))<0:
-           TimeGapValsInteresting.append(np.fabs(pmt_pulse_time-driver_noise_time))
-           for j in range(len(time_trace)):
-               if time_trace[j]*1e9 > driver_noise_time:
-	           noiseCrossIndexInteresting.append(j)
-	           break
-        else:
-           TimeGapVals.append(np.fabs(pmt_pulse_time-driver_noise_time))
-           for j in range(len(time_trace)):
-               if time_trace[j]*1e9 > driver_noise_time:
-	           noiseCrossIndex.append(j)
-	           break
+        TimeGapVals.append(np.fabs(pmt_pulse_time-driver_noise_time))
+        for j in range(len(time_trace)):
+            if time_trace[j]*1e9 > driver_noise_time:
+                noiseCrossIndex.append(j)
+                break
     timeGapHisto = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeak","TimeDifferencebetweennoiseandPMTPeak",50,(np.amin(TimeGapVals)-10),(np.amax(TimeGapVals)+10))
-    if len(TimeGapValsInteresting)<1: 
-        TimeGapValsInteresting = [10,90]
-    timeGapHistoInteresting = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeakLessthan100nsGap","TimeDifferencebetweennoiseandPMTPeakLessthan100nsGap",50,(np.amin(TimeGapValsInteresting)-10),(np.amax(TimeGapValsInteresting)+10))
     for timeGapVal in TimeGapVals:
         timeGapHisto.Fill(float(timeGapVal))
     
-    for timeGapValInteresting in TimeGapValsInteresting:
-        timeGapHistoInteresting.Fill(float(timeGapValInteresting))
     
     plt.figure(1)
     plt.subplot(211)
@@ -118,22 +104,6 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     for i in range(len(noiseCrossIndex)):
         pmt_trace = pmt_traces[i]
         plt.plot(np.multiply(time_trace[noiseCrossIndex[i]-150:]-time_trace[noiseCrossIndex[i]-150],1e9),pmt_trace[noiseCrossIndex[i]-150:],label="Trace: "+str(i))
-    plt.ylabel("PMT Pulse")
-    plt.xlabel("Time (ns)")
-    plt.subplot(211)
-    ax = plt.gca()
-    ax.set_xticklabels([])
-    
-    plt.figure(2)
-    plt.subplot(211)
-    plt.ylabel("Ground Noise Voltage (V)")
-    for i in range(len(noiseCrossIndexInteresting)):
-        noise_trace = noise_traces[i]
-        plt.plot(np.multiply(time_trace[noiseCrossIndexInteresting[i]-150:]-time_trace[noiseCrossIndexInteresting[i]-150],1e9),noise_trace[noiseCrossIndexInteresting[i]-150:],label="Trace: "+str(i))
-    plt.subplot(212)
-    for i in range(len(noiseCrossIndexInteresting)):
-        pmt_trace = pmt_traces[i]
-        plt.plot(np.multiply(time_trace[noiseCrossIndexInteresting[i]-150:]-time_trace[noiseCrossIndexInteresting[i]-150],1e9),pmt_trace[noiseCrossIndexInteresting[i]-150:],label="Trace: "+str(i))
     plt.ylabel("PMT Pulse")
     plt.xlabel("Time (ns)")
     plt.subplot(211)
@@ -158,7 +128,7 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     ax.set_xticklabels([])
     
     
-    return timeGapHisto, timeGapHistoInteresting
+    return timeGapHisto 
 
 if __name__=="__main__":
     parser = optparse.OptionParser()
@@ -200,23 +170,41 @@ if __name__=="__main__":
     colIter = 1
     posPeakNoiseTotal = []
     negPeakNoiseTotal = []
+    absPeakNoiseTotal = []
+    absPeakNoiseAvg = []
+    absPeakNoiseError = []
+    posPeakNoiseAvg = []
+    posPeakNoiseError = []
+    negPeakNoiseAvg = []
+    negPeakNoiseError = []
     for noise_file in os.listdir(noise_dir):
         x1 = None
         y1 = None
         posPeakNoise = []
         negPeakNoise = []
+        absPeakNoise  = []
         try:
             x1,y1 = calc.readPickleChannel(os.path.join(noise_dir,noise_file), 1,False)
         except:
             continue
         for i in range(len(y1)):
             noise_traces.append(y1[i])
-            posPeakNoise.append(np.amax(y1))
-            negPeakNoise.append(np.amin(y1))
-            posPeakNoiseTotal.append(np.amax(y1))
-            negPeakNoiseTotal.append(np.amin(y1))
-        posNoiseHisto = ROOT.TH1D("Positive Peak Noise"+str(colIter),"Positive Peak Noise"+str(colIter),25,0.56,0.63)
-        negNoiseHisto = ROOT.TH1D("Negative Peak Noise"+str(colIter),"Negative Peak Noise"+str(colIter),25,-0.63,0.56)
+            posPeakNoise.append(np.amax(y1[i]))
+            negPeakNoise.append(np.amin(y1[i]))
+            posPeakNoiseTotal.append(np.amax(y1[i]))
+            negPeakNoiseTotal.append(np.amin(y1[i]))
+            absPeakNoiseTotal.append(np.amax(np.fabs(y1[i])))
+            absPeakNoise.append(np.amax(np.fabs(y1[i])))
+       
+        
+        absPeakNoiseAvg.append(np.mean(absPeakNoise))
+        absPeakNoiseError.append(np.std(absPeakNoise)/np.sqrt(len(absPeakNoise)))
+        posPeakNoiseAvg.append(np.mean(posPeakNoise))
+        posPeakNoiseError.append(np.std(posPeakNoise)/np.sqrt(len(posPeakNoise)))
+        negPeakNoiseAvg.append(np.mean(negPeakNoise))
+        negPeakNoiseError.append(np.std(negPeakNoise)/np.sqrt(len(negPeakNoise)))
+        posNoiseHisto = ROOT.TH1D("Positive Peak Noise"+str(colIter),"Positive Peak Noise"+str(colIter),40,0.4,0.75)
+        negNoiseHisto = ROOT.TH1D("Negative Peak Noise"+str(colIter),"Negative Peak Noise"+str(colIter),40,-0.6,-0.25)
         posNoiseHisto.SetFillColor(colIter)
         negNoiseHisto.SetFillColor(colIter)
         colIter+= 1
@@ -246,7 +234,8 @@ if __name__=="__main__":
     check_dir("root_files/Box%02d"%(box))
     check_dir("root_files/Box_%02d/Channel_%02d/"%(box,channel))
     outRoot = ROOT.TFile("root_files/Box_%02d/Channel_%02d/histos.root" %(box,channel),"RECREATE") 
-    
+   
+
     pinHisto = ROOT.TH1D("PinValues","PinValues",int(np.amax(pin_vals)-np.amin(pin_vals))+4,np.amin(pin_vals)-1,np.amax(pin_vals)+1)
     for pinVal in pin_vals:
         pinHisto.Fill(pinVal)
@@ -281,6 +270,12 @@ if __name__=="__main__":
     photonHistoSingle = ROOT.TH1D("PhotonCountSingle","PhotonCountSingle",100,np.amin(photonCounts)-10,np.amax(photonCounts)+10)
     photonHistoRMS = ROOT.TH1D("PhotonCountRMS","PhotonCountRMS",20,np.amin(photonRMS)-10,np.amax(photonRMS)+10)
    
+    posNoiseVsPhoton = ROOT.TH2D("MaximumNoiseVoltageVsPhotonCount","MaximumNoiseVoltageVsPhotonCount",15,np.amin(posPeakNoiseTotal)-.01,np.amax(posPeakNoiseTotal)+.01,75,np.amin(photonCounts)-100,np.amax(photonCounts)+100) 
+    negNoiseVsPhoton = ROOT.TH2D("MaximumNegativeNoiseVoltageVsPhotonCount","MaximumNegativeNoiseVoltageVsPhotonCount",15,np.amin(negPeakNoiseTotal)-.01,np.amax(negPeakNoiseTotal)+.01,75,np.amin(photonCounts)-100,np.amax(photonCounts)+100) 
+    
+    for i in range(len(photonCounts)):
+        posNoiseVsPhoton.Fill(posPeakNoiseTotal[i],photonCounts[i])
+        negNoiseVsPhoton.Fill(negPeakNoiseTotal[i],photonCounts[i])
     for photonSingleVal in photonCounts:
         photonHistoSingle.Fill(photonSingleVal) 
 
@@ -292,11 +287,10 @@ if __name__=="__main__":
 
     pinRMSHisto.Write()
 
-    timeGapHisto, timeGapHistoInteresting = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.1)
+    timeGapHisto  = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.1)
     
     timeGapHisto.Write()
     
-    timeGapHistoInteresting.Write()
 
     photonHistoSingle.Write()
     
@@ -310,9 +304,10 @@ if __name__=="__main__":
     totalPosNoiseHisto.Write()
     totalNegNoiseHisto.Write()
 
+    posNoiseVsPhoton.Write()
+    negNoiseVsPhoton.Write()
     outRoot.Close()
-    
-     
+    print posPeakNoiseError 
     plt.figure(0)
     plt.errorbar(pin_vals,photonCountsAverage,yerr=np.divide(photonRMS,np.sqrt(numReadings)),xerr=np.divide(pin_rms,np.sqrt(npulses)),linestyle="",fmt="")
     plt.scatter(pin_vals,photonCountsAverage,s=10*range(1,(len(pin_vals))+1))
@@ -321,7 +316,35 @@ if __name__=="__main__":
     plt.savefig("root_files/Box_%02d/Channel_%02d/PhotonVsPin.png"%(box,channel))
     plt.figure(1)
     plt.savefig("root_files/Box_%02d/Channel_%02d/envelope.png"%(box,channel))
-    plt.figure(2)
-    plt.savefig("root_files/Box_%02d/Channel_%02d/envelopeLessThan350ns.png"%(box,channel))
     plt.figure(3)
     plt.savefig("root_files/Box_%02d/Channel_%02d/envelopeRAW.png"%(box,channel))
+    plt.figure(4)
+    plt.xlabel("Absolute Peak Noise")
+    plt.ylabel("Photon Count")
+    plt.scatter(absPeakNoiseTotal,photonCounts)
+    plt.savefig("root_files/Box_%02d/Channel_%02d/absPeakNoiseVsPhotonCount.png"%(box,channel))
+    plt.figure(5)
+    plt.xlabel("Average Absolute Peak Noise")
+    plt.ylabel("PIN  Readings")
+    plt.errorbar(absPeakNoiseAvg,pin_vals,yerr=np.divide(pin_rms,np.sqrt(npulses)),xerr=absPeakNoiseError,linestyle="")
+    plt.savefig("root_files/Box_%02d/Channel_%02d/meanAbsPeakNoiseVsPIN.png"%(box,channel))
+
+    readingsCount = range(1,22)
+    plt.figure(6)
+    plt.xlabel("Reading Number")
+    sub = plt.subplot(2,2,1)
+    sub.set_ylabel("Photon Count")
+    plt.errorbar(readingsCount,photonCountsAverage,yerr=np.divide(photonRMS,np.sqrt(numReadings)),linestyle="")
+    sub = plt.subplot(2,2,2)
+    sub.yaxis.tick_right()
+    sub.set_ylabel("PIN Reading")
+    plt.errorbar(readingsCount,pin_vals,yerr=np.divide(pin_rms,np.sqrt(npulses)),linestyle="")
+    sub = plt.subplot(2,2,3)
+    sub.set_ylabel("Average Max Positive Noise (V)")
+    plt.errorbar(readingsCount,posPeakNoiseAvg,yerr=posPeakNoiseError,linestyle="")
+    sub = plt.subplot(2,2,4)
+    sub.set_ylabel("Average Max Negative Noise (V)")
+    sub.yaxis.tick_right()
+    plt.errorbar(readingsCount,negPeakNoiseAvg,yerr=negPeakNoiseError,linestyle="")
+    plt.savefig("root_files/Box_%02d/Channel_%02d/readingResults.png"%(box,channel))
+
