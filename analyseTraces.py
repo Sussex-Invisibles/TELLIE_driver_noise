@@ -81,13 +81,36 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     offsetFWHMError = []
     timeGapValsSingle = []
     pmtPulseTimes = []
+    ledPulseTimeVoltages = []
+    ledPulseTimeVoltagesMeans = []
+    fftFrequencies = []
+    fftValues = []
+    sampleIndex = 0
     for i in range(len(pmt_traces)):
         pmt_pulse_time = calcPeakRisePoint(time_trace,pmt_traces[i],0.2)*1e9
         #driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amin(noise_traces[i]))*1e9
         #driver_noise_time = calcPeakRisePoint(time_trace,noise_traces[i],noise_threshold)*1e9
         driver_noise_time = getPosThresholdCrossing(time_trace,noise_traces[i],0.3)*1e9
         pmtPulseTimes.append(pmt_pulse_time)
-         
+        led_pulse_time = pmt_pulse_time-237.6
+        noise_vals = []
+
+        #Doing fourier transform analysis
+        if i==0:
+           #Getting index 20 ns before PMT pulse
+           sampleIndex = np.argwhere(time_trace > pmt_pulse_time*1e-9)[-50]
+           fftValues = np.fft.rfft(pmt_traces[i][:sampleIndex])
+           fftFrequencies = np.fft.rfftfreq(sampleIndex)
+        else:
+           fftValues += np.fft.rfft(pmt_traces[i][:sampleIndex])
+        for entry in np.argwhere(time_trace >= led_pulse_time*1e-9)[:6]:
+            ledPulseTimeVoltages.append(noise_traces[i][entry])
+            noise_vals.append(noise_traces[i][entry])
+        for entry in np.argwhere(time_trace < led_pulse_time*1e-9)[-5:]:
+            ledPulseTimeVoltages.append(noise_traces[i][entry])
+            noise_vals.append(noise_traces[i][entry])
+             
+            ledPulseTimeVoltagesMeans.append(np.mean(noise_vals)) 
 
         if not np.isfinite(driver_noise_time) or not np.isfinite(pmt_pulse_time):
             continue
@@ -112,10 +135,15 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     
 
     timeGapHisto = ROOT.TH1D("TimeDifferencebetweennoiseandPMTPeak","TimeDifferencebetweennoiseandPMTPeak",50,(np.amin(TimeGapVals)-10),(np.amax(TimeGapVals)+10))
+    LEDPulseTimeNoiseVoltageHisto = ROOT.TH1D("GroundNoiseVoltageWhenLEDIsPulsing","GroundNoiseVoltageWhenLEDIsPulsing",50,(np.amin(ledPulseTimeVoltages)-0.01),(np.amax(ledPulseTimeVoltages)+0.01))
     for timeGapVal in TimeGapVals:
         timeGapHisto.Fill(float(timeGapVal))
-    
-    
+   
+    for noiseVoltage in ledPulseTimeVoltages:
+        LEDPulseTimeNoiseVoltageHisto.Fill(float(noiseVoltage))
+   
+    LEDPulseTimeNoiseVoltageHisto.Write() 
+
     plt.figure(1)
     plt.subplot(211)
     plt.ylabel("Ground Noise Voltage (V)")
@@ -168,8 +196,26 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     plt.subplot(211)
     ax = plt.gca()
     ax.set_xticklabels([])
+
+    plt.figure(10)
+    sub =plt.subplot(211)
+    plt.ylabel("Fourier Transform of PMT dark noise")
+    plt.plot(fftFrequencies,fftValues)
+    sub.set_xlabel("Frequency (Hz)")
+    plt.axvline(np.mean(pmtPulseTimes[k])-237.6,linewidth=2,color="black")
+    sub = plt.subplot(212)
+    for k in range(len(pmt_traces)):
+        pmt_trace = pmt_traces[k]
+        plt.plot(np.multiply(time_trace[:sampleIndex],1e9),pmt_trace[:sampleIndex],label="Trace: "+str(i))
+        plt.axvline(pmtPulseTimes[k]-237.6,linewidth=2,color="black")
+    sub.set_ylabel("PMT Noise")
+    sub.set_xlabel("Time (ns)")
+
+
+
+
     
-    return timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError
+    return timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError, ledPulseTimeVoltagesMeans
 
 if __name__=="__main__":
     parser = optparse.OptionParser()
@@ -353,10 +399,17 @@ if __name__=="__main__":
 
     pinRMSHisto.Write()
 
-    timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError  = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.1)
+    timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError, ledPulseTimeNoiseVoltages  = createTimeGapHisto(time_trace,pmt_traces,noise_traces,0.1)
+    
+    photonCountVsPulseTimeNoiseVoltage = ROOT.TH2D("photonCountVsledPulseTimeNoiseVoltages","photonCountVsledPulseTimeNoiseVoltages",20,np.amin(ledPulseTimeNoiseVoltages)-.01,np.amax(ledPulseTimeNoiseVoltages)+.01,75,np.amin(photonCounts)-100,np.amax(photonCounts)+100) 
+    
+    for k in range(len(photonCounts)):
+         photonCountVsPulseTimeNoiseVoltage.Fill(ledPulseTimeNoiseVoltages[k],photonCounts[k])
     
     
     timeGapHisto.Write()
+
+    photonCountVsPulseTimeNoiseVoltage.Write()
     
 
     photonHistoSingle.Write()
@@ -460,3 +513,9 @@ if __name__=="__main__":
         plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelopeMean.png"%(box,channel))
     else:
         plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelopeMean%05d.png"%(box,channel,width))
+    
+    plt.figure(10)
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/PMTNoiseFreq.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/PMTNoiseFreq%05d.png"%(box,channel,width))
