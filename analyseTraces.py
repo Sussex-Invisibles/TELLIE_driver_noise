@@ -159,6 +159,7 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     plt.subplot(211)
     plt.ylabel("Mean Ground Noise Voltage (V)")
     plt.plot(np.multiply(time_trace,1e9),np.mean(noise_traces,0))
+    plt.axvline(np.mean(pmtPulseTimes[k])-237.6,linewidth=2,color="black")
     plt.subplot(212)
     plt.plot(np.multiply(time_trace,1e9),np.mean(pmt_traces,0))
     plt.axvline(np.mean(pmtPulseTimes[i])-237.6,linewidth=2,color="black")
