@@ -24,6 +24,7 @@ if __name__=="__main__":
     parser.add_option("-c",dest="channel",help="Channel number (1-8)")
     parser.add_option("-i",dest="ipw",help="IPW value to run at")
     parser.add_option("-t",dest="nmins",help="Number of mins to run for")
+    parser.add_option("-d",dest="root_dir",help="root directory to output files to")
     (options,args) = parser.parse_args()
 
     #Time
@@ -34,6 +35,7 @@ if __name__=="__main__":
     channel = int(options.channel)
     ipw = int(options.ipw)
     nmins = int(options.nmins)
+    root_dir = str(options.root_dir)
 
     #Fixed parameters
     delay = 1.0 # 1ms -> kHz
@@ -77,9 +79,9 @@ if __name__=="__main__":
 
 
     #Create a new, timestamped, summary file
-    saveDirNoise = sweep_noise.check_dir('./tenTimesIntensity/driver_noise')
-    saveDirPMTResponse = sweep_noise.check_dir("./tenTimesIntensity/pmt_response")
-    saveDirPINResponse = sweep_noise.check_dir("./tenTimesIntensity/pin_response")
+    saveDirNoise = sweep_noise.check_dir(root_dir+'/driver_noise')
+    saveDirPMTResponse = sweep_noise.check_dir(root_dir+"/pmt_response")
+    saveDirPINResponse = sweep_noise.check_dir(root_dir+"/pin_response")
 
     saveDirNoise = sweep_noise.check_dir("%s/Box_%02d" % (saveDirNoise,box))
     saveDirPMTResponse =  sweep_noise.check_dir("%s/Box_%02d" % (saveDirPMTResponse,box))
@@ -101,7 +103,7 @@ if __name__=="__main__":
 	    timestamp = time.strftime("%y%m%d_%H.%M.%S",time.gmtime())
 	    output_dirname_noise = ("%s/Time__%s" % (saveDirNoise,timestamp))
 	    output_dirname_pmt = ("%s/Time__%s" % (saveDirPMTResponse,timestamp))
-	    output_filename_pin = sweep_noise.check_dir("%s/Time__%s.dat" % (saveDirPINResponse,timestamp))
+	    output_filename_pin = sweep_noise.check_dir("%s/Time__%sWidth%05d.dat" % (saveDirPINResponse,timestamp,ipw))
             saveDirs[0] = output_dirname_pmt
             saveDirs[1] = output_dirname_noise
             print saveDirs 

@@ -80,11 +80,13 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     offsetFWHM = []
     offsetFWHMError = []
     timeGapValsSingle = []
+    pmtPulseTimes = []
     for i in range(len(pmt_traces)):
         pmt_pulse_time = calcPeakRisePoint(time_trace,pmt_traces[i],0.2)*1e9
         #driver_noise_time = calc.interpolate_threshold(time_trace,np.fabs(noise_traces[i]),noise_threshold*np.amin(noise_traces[i]))*1e9
         #driver_noise_time = calcPeakRisePoint(time_trace,noise_traces[i],noise_threshold)*1e9
         driver_noise_time = getPosThresholdCrossing(time_trace,noise_traces[i],0.3)*1e9
+        pmtPulseTimes.append(pmt_pulse_time)
          
 
         if not np.isfinite(driver_noise_time) or not np.isfinite(pmt_pulse_time):
@@ -117,13 +119,16 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     plt.figure(1)
     plt.subplot(211)
     plt.ylabel("Ground Noise Voltage (V)")
-    for i in range(len(noiseCrossIndex)):
-        noise_trace = noise_traces[i]
-        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]-150:]-time_trace[noiseCrossIndex[i]-150],1e9),noise_trace[noiseCrossIndex[i]-150:],label="Trace: "+str(i))
+    for k in range(len(noiseCrossIndex)):
+        noise_trace = noise_traces[k]
+        plt.plot(np.multiply(time_trace[noiseCrossIndex[k]-150:]-time_trace[noiseCrossIndex[k]-150],1e9),noise_trace[noiseCrossIndex[k]-150:],label="Trace: "+str(k))
+        plt.axvline(pmtPulseTimes[k]-237.6-(time_trace[noiseCrossIndex[k]-150]*1e9),linewidth=2,color="black")
     plt.subplot(212)
-    for i in range(len(noiseCrossIndex)):
-        pmt_trace = pmt_traces[i]
-        plt.plot(np.multiply(time_trace[noiseCrossIndex[i]-150:]-time_trace[noiseCrossIndex[i]-150],1e9),pmt_trace[noiseCrossIndex[i]-150:],label="Trace: "+str(i))
+    for k in range(len(noiseCrossIndex)):
+        pmt_trace = pmt_traces[k]
+        plt.plot(np.multiply(time_trace[noiseCrossIndex[k]-150:]-time_trace[noiseCrossIndex[k]-150],1e9),pmt_trace[noiseCrossIndex[k]-150:],label="Trace: "+str(i))
+        plt.axvline(pmtPulseTimes[k]-237.6-(time_trace[noiseCrossIndex[k]-150]*1e9),linewidth=2,color="black")
+       
     plt.ylabel("PMT Pulse")
     plt.xlabel("Time (ns)")
     plt.subplot(211)
@@ -134,19 +139,34 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     plt.figure(3)
     plt.subplot(211)
     plt.ylabel("Ground Noise Voltage (V)")
-    for i in range(len(noise_traces)):
-        noise_trace = noise_traces[i]
+    for k in range(len(noise_traces)):
+        noise_trace = noise_traces[k]
         plt.plot(np.multiply(time_trace,1e9),noise_trace,label="Trace: "+str(i))
+        plt.axvline(pmtPulseTimes[k]-237.6,linewidth=2,color="black")
     plt.subplot(212)
-    for i in range(len(pmt_traces)):
-        pmt_trace = pmt_traces[i]
+    for k in range(len(pmt_traces)):
+        pmt_trace = pmt_traces[k]
         plt.plot(np.multiply(time_trace,1e9),pmt_trace,label="Trace: "+str(i))
+        plt.axvline(pmtPulseTimes[k]-237.6,linewidth=2,color="black")
     plt.ylabel("PMT Pulse")
     plt.xlabel("Time (ns)")
     plt.subplot(211)
     ax = plt.gca()
     ax.set_xticklabels([])
-    
+
+
+    plt.figure(9)
+    plt.subplot(211)
+    plt.ylabel("Mean Ground Noise Voltage (V)")
+    plt.plot(np.multiply(time_trace,1e9),np.mean(noise_traces,0))
+    plt.subplot(212)
+    plt.plot(np.multiply(time_trace,1e9),np.mean(pmt_traces,0))
+    plt.axvline(np.mean(pmtPulseTimes[i])-237.6,linewidth=2,color="black")
+    plt.ylabel("Mean PMT Pulse")
+    plt.xlabel("Time (ns)")
+    plt.subplot(211)
+    ax = plt.gca()
+    ax.set_xticklabels([])
     
     return timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError
 
@@ -154,16 +174,20 @@ if __name__=="__main__":
     parser = optparse.OptionParser()
     parser.add_option("-b",dest="box",help="Box number (1-12)")
     parser.add_option("-c",dest="channel",help="Channel number (1-8)")
+    parser.add_option("-i",dest="ipw",help="IPW Value you want to make plots for",default=-1000)
+    parser.add_option("-d",dest="root_dir",help="root directory to output files to and read data files from")
     (options,args) = parser.parse_args()
 
     
     #Set passed TELLIE parameters
     box = int(options.box)
     channel = int(options.channel)
+    width = int(options.ipw)
+    root_dir = str(options.root_dir)
 
-    pmt_dir = os.path.dirname("pmt_response/Box_%02d/Channel_%02d/" % (box,channel))
-    pin_dir = os.path.dirname("pin_response/Box_%02d/Channel_%02d/" % (box,channel))
-    noise_dir = os.path.dirname("driver_noise/Box_%02d/Channel_%02d/" % (box,channel))
+    pmt_dir = os.path.dirname(root_dir+"/pmt_response/Box_%02d/Channel_%02d/" % (box,channel))
+    pin_dir = os.path.dirname(root_dir+"/pin_response/Box_%02d/Channel_%02d/" % (box,channel))
+    noise_dir = os.path.dirname(root_dir+"/driver_noise/Box_%02d/Channel_%02d/" % (box,channel))
     #Array to store x Values 
     time_trace = []
     got_time_trace = False
@@ -177,6 +201,9 @@ if __name__=="__main__":
     for pmt_file in os.listdir(pmt_dir):
         x1 = None
         y1 = None
+        if width != -1000:
+            if int(pmt_file[-9:-4]) != width:
+               continue
         try:
             x1,y1 = calc.readPickleChannel(os.path.join(pmt_dir,pmt_file), 1,False)
         except:
@@ -200,6 +227,10 @@ if __name__=="__main__":
     
 
     for noise_file in os.listdir(noise_dir):
+        if width != -1000:
+            if int(noise_file[-9:-4]) != width:
+               continue
+       
         x1 = None
         y1 = None
         posPeakNoise = []
@@ -248,14 +279,22 @@ if __name__=="__main__":
         totalNegNoiseHisto.Fill(entry)
     
     for pin_file in os.listdir(pin_dir):
+        if width != -1000:
+            if int(pin_file[-9:-4]) != width:
+               continue
+       
         print pin_file
         numPulses,pin,rms = readPinFile(os.path.join(pin_dir,pin_file))
         pin_vals.append(pin)
         pin_rms.append(rms)
         npulses.append(numPulses)
-    check_dir("root_files/Box%02d"%(box))
-    check_dir("root_files/Box_%02d/Channel_%02d/"%(box,channel))
-    outRoot = ROOT.TFile("root_files/Box_%02d/Channel_%02d/histos.root" %(box,channel),"RECREATE") 
+    check_dir(root_dir+"/root_files/Box%02d"%(box))
+    check_dir(root_dir+"/root_files/Box_%02d/Channel_%02d/"%(box,channel))
+    outRoot = 0 
+    if width == -1000:
+        outRoot = ROOT.TFile(root_dir+"/root_files/Box_%02d/Channel_%02d/histos.root" %(box,channel),"RECREATE") 
+    else:
+        outRoot = ROOT.TFile(root_dir+"/root_files/Box_%02d/Channel_%02d/histosWidth%05d.root" %(box,channel,width),"RECREATE") 
    
 
     pinHisto = ROOT.TH1D("PinValues","PinValues",int(np.amax(pin_vals)-np.amin(pin_vals))+4,np.amin(pin_vals)-1,np.amax(pin_vals)+1)
@@ -274,6 +313,9 @@ if __name__=="__main__":
     photonCounts = []
     photonRMS = []
     for pmt_file in os.listdir(pmt_dir):
+        if width != -1000:
+            if int(pmt_file[-9:-4]) != width:
+               continue
         x1 = None
         y1 = None
         try:
@@ -337,21 +379,36 @@ if __name__=="__main__":
     plt.scatter(pin_vals,photonCountsAverage,s=10*range(1,(len(pin_vals))+1))
     plt.xlabel("PIN Reading")
     plt.ylabel("Photon Count")
-    plt.savefig("root_files/Box_%02d/Channel_%02d/PhotonVsPin.png"%(box,channel))
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/PhotonVsPin.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/PhotonVsPinWidth%05d.png"%(box,channel,width))
     plt.figure(1)
-    plt.savefig("root_files/Box_%02d/Channel_%02d/envelope.png"%(box,channel))
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelope.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelopeWidth%05d.png"%(box,channel,width))
     plt.figure(3)
-    plt.savefig("root_files/Box_%02d/Channel_%02d/envelopeRAW.png"%(box,channel))
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelopeRAW.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelopeRAWWidth%05d.png"%(box,channel,width))
     plt.figure(4)
     plt.xlabel("Absolute Peak Noise")
     plt.ylabel("Photon Count")
     plt.scatter(absPeakNoiseTotal,photonCounts)
-    plt.savefig("root_files/Box_%02d/Channel_%02d/absPeakNoiseVsPhotonCount.png"%(box,channel))
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/absPeakNoiseVsPhotonCount.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/absPeakNoiseVsPhotonCountWidth%05d.png"%(box,channel,width))
     plt.figure(5)
     plt.xlabel("Average Absolute Peak Noise")
     plt.ylabel("PIN  Readings")
     plt.errorbar(absPeakNoiseAvg,pin_vals,yerr=np.divide(pin_rms,np.sqrt(npulses)),xerr=absPeakNoiseError,linestyle="")
-    plt.savefig("root_files/Box_%02d/Channel_%02d/meanAbsPeakNoiseVsPIN.png"%(box,channel))
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/meanAbsPeakNoiseVsPIN.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/meanAbsPeakNoiseVsPINWidth%05d.png"%(box,channel,width))
 
     readingsCount = range(1,22)
     plt.figure(6)
@@ -370,15 +427,20 @@ if __name__=="__main__":
     sub.set_ylabel("Average Max Negative Noise (V)")
     sub.yaxis.tick_right()
     plt.errorbar(readingsCount,negPeakNoiseAvg,yerr=negPeakNoiseError,linestyle="")
-    plt.savefig("root_files/Box_%02d/Channel_%02d/readingResults.png"%(box,channel))
-
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/readingResults.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/readingResultsWidth%05d.png"%(box,channel,width))
     print "Len mean offset: "+str(len(meanOffset))
     print "Len mean offset error: "+str(len(meanOffsetError))
     plt.figure(7)
     plt.xlabel("Reading Number")
     plt.ylabel("Mean Time Offset (ns)")
     plt.errorbar(readingsCount,meanOffset,yerr=meanOffsetError)
-    plt.savefig("root_files/Box_%02d/Channel_%02d/readingMeanOffset.png"%(box,channel))
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/readingMeanOffset.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/readingMeanOffsetWidth%05d.png"%(box,channel,width))
     
     print "Len mean offset FWHM: "+str(len(offsetFWHM))
     print "Len mean offset FWHM error: "+str(len(offsetFWHMError))
@@ -386,4 +448,14 @@ if __name__=="__main__":
     plt.xlabel("Reading Number")
     plt.ylabel("Time Offset FWHM (ns)")
     plt.errorbar(readingsCount,offsetFWHM,yerr=offsetFWHMError)
-    plt.savefig("root_files/Box_%02d/Channel_%02d/OffsetFWHM.png"%(box,channel))
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/OffsetFWHM.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/OffsetFWHM%05d.png"%(box,channel,width))
+
+
+    plt.figure(9)
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelopeMean.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/envelopeMean%05d.png"%(box,channel,width))
