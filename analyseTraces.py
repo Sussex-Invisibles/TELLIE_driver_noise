@@ -95,14 +95,14 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
         led_pulse_time = pmt_pulse_time-237.6
         noise_vals = []
 
-        #Doing fourier transform analysis
+        #Doing fourier transform analysis on PMT pulse
         if i==0:
            #Getting index 20 ns before PMT pulse
-           sampleIndex = np.argwhere(time_trace > pmt_pulse_time*1e-9)[-50]
-           fftValues = np.fft.rfft(pmt_traces[i][:sampleIndex])
-           fftFrequencies = np.fft.rfftfreq(sampleIndex)
+           sampleIndex = int(np.argwhere(time_trace > pmt_pulse_time*1e-9)[-50])
+           fftValues = np.absolute(np.fft.rfft(pmt_traces[i][:sampleIndex]))
+           fftFrequencies = np.fft.rfftfreq(sampleIndex,0.4e-9)
         else:
-           fftValues += np.fft.rfft(pmt_traces[i][:sampleIndex])
+           fftValues += np.absolute(np.fft.rfft(pmt_traces[i][:sampleIndex]))
         for entry in np.argwhere(time_trace >= led_pulse_time*1e-9)[:6]:
             ledPulseTimeVoltages.append(noise_traces[i][entry])
             noise_vals.append(noise_traces[i][entry])
@@ -202,7 +202,8 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     plt.ylabel("Fourier Transform of PMT dark noise")
     plt.plot(fftFrequencies,fftValues)
     sub.set_xlabel("Frequency (Hz)")
-    plt.axvline(np.mean(pmtPulseTimes[k])-237.6,linewidth=2,color="black")
+    print fftFrequencies
+    print fftValues
     sub = plt.subplot(212)
     for k in range(len(pmt_traces)):
         pmt_trace = pmt_traces[k]
@@ -210,12 +211,48 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
         plt.axvline(pmtPulseTimes[k]-237.6,linewidth=2,color="black")
     sub.set_ylabel("PMT Noise")
     sub.set_xlabel("Time (ns)")
-
-
-
-
     
     return timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError, ledPulseTimeVoltagesMeans
+
+
+def fftNoiseTraceLowPassFilter(time_trace,noise_traces,threshold_lower=0.02e9,threshold_upper=2.5e9):
+    fftValues = []
+    fftSingleTraceValues = []
+    fftFrequencies = []
+    filteredNoise = []
+    cutoffIndexUpper = 0
+    cutoffIndexLower = 0
+    for i in range(len(noise_traces)):
+        if i==0:
+           #Getting index 20 ns before PMT pulse
+           fftValues = np.absolute(np.fft.rfft(noise_traces[i]))
+           fftSingleTraceValues.append(np.fft.rfft(noise_traces[i]))
+           fftFrequencies = np.fft.rfftfreq(len(noise_traces[i]),0.4e-9)
+           cutoffIndexUpper = int(np.where(fftFrequencies < threshold_upper)[-1][-1])
+           cutoffIndexlower = int(np.where(fftFrequencies > threshold_lower)[-1][0])
+           filteredNoise.append(np.fft.irfft(fftSingleTraceValues[i][cutoffIndexLower:cutoffIndexUpper]))
+           
+        else:
+           fftSingleTraceValues.append(np.fft.rfft(noise_traces[i]))
+           fftValues += np.absolute(np.fft.rfft(noise_traces[i]))
+           filteredNoise.append(np.fft.irfft(fftSingleTraceValues[i][cutoffIndexLower:cutoffIndexUpper]))
+
+    timeValues = np.arange(0,np.amax(time_trace),np.amax(time_trace)/len(filteredNoise[0]))
+    plt.figure(20)
+    sub = plt.subplot(311)
+    sub.set_ylabel("Ground Noise Voltage (V)")
+    for i in range(len(noise_traces)):
+        plt.plot(np.multiply(time_trace,1e9),(noise_traces[i]))
+    sub = plt.subplot(312)
+    plt.plot(fftFrequencies,fftValues)
+    sub.set_ylabel("Sum of Abs Fourier transform")
+    sub.set_xlabel("Frequency (Hz)")
+    sub = plt.subplot(313)
+    sub.set_ylabel("Filtered ground noise with cutoff %f to %f"%(threshold_lower,threshold_upper))
+    sub.set_xlabel("Time (ns)")
+    for i in range(len(filteredNoise)):
+        plt.plot(np.multiply(timeValues,1e9),filteredNoise[i])
+
 
 if __name__=="__main__":
     parser = optparse.OptionParser()
@@ -335,6 +372,10 @@ if __name__=="__main__":
         pin_vals.append(pin)
         pin_rms.append(rms)
         npulses.append(numPulses)
+    
+     
+    
+    
     check_dir(root_dir+"/root_files/Box%02d"%(box))
     check_dir(root_dir+"/root_files/Box_%02d/Channel_%02d/"%(box,channel))
     outRoot = 0 
@@ -519,3 +560,11 @@ if __name__=="__main__":
         plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/PMTNoiseFreq.png"%(box,channel))
     else:
         plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/PMTNoiseFreq%05d.png"%(box,channel,width))
+    
+    fftNoiseTraceLowPassFilter(time_trace,noise_traces)
+    plt.figure(20)
+    
+    if width == -1000:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/filteredGroundNoise.png"%(box,channel))
+    else:
+        plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/filteredGroundNoise%05d.png"%(box,channel,width))
