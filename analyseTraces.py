@@ -95,7 +95,6 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
         led_pulse_time = pmt_pulse_time-237.6
         noise_vals = []
 
-        #Doing fourier transform analysis on PMT pulse
         if i==0:
            #Getting index 20 ns before PMT pulse
            sampleIndex = int(np.argwhere(time_trace > pmt_pulse_time*1e-9)[-50])
@@ -215,9 +214,10 @@ def createTimeGapHisto(time_trace,pmt_traces,noise_traces,noise_threshold):
     return timeGapHisto, meanOffset, meanOffsetError, offsetFWHM, offsetFWHMError, ledPulseTimeVoltagesMeans
 
 
-def fftNoiseTraceLowPassFilter(time_trace,noise_traces,threshold_lower=0.02e9,threshold_upper=2.5e9):
+def fftNoiseTraceLowPassFilter(time_trace,noise_traces,threshold_lower=0.0e9,threshold_upper=0.1e9):
     fftValues = []
     fftSingleTraceValues = []
+    scalingFactor = []
     fftFrequencies = []
     filteredNoise = []
     cutoffIndexUpper = 0
@@ -225,17 +225,19 @@ def fftNoiseTraceLowPassFilter(time_trace,noise_traces,threshold_lower=0.02e9,th
     for i in range(len(noise_traces)):
         if i==0:
            #Getting index 20 ns before PMT pulse
-           fftValues = np.absolute(np.fft.rfft(noise_traces[i]))
-           fftSingleTraceValues.append(np.fft.rfft(noise_traces[i]))
+           fftValues = np.absolute(np.fft.rfft(noise_traces[i],norm="ortho"))
+           fftSingleTraceValues.append(np.fft.rfft(noise_traces[i],norm="ortho"))
            fftFrequencies = np.fft.rfftfreq(len(noise_traces[i]),0.4e-9)
            cutoffIndexUpper = int(np.where(fftFrequencies < threshold_upper)[-1][-1])
            cutoffIndexlower = int(np.where(fftFrequencies > threshold_lower)[-1][0])
-           filteredNoise.append(np.fft.irfft(fftSingleTraceValues[i][cutoffIndexLower:cutoffIndexUpper]))
+           scalingFactor.append(np.trapz(fftFrequencies[cutoffIndexlower:cutoffIndexUpper],fftValues[cutoffIndexlower:cutoffIndexUpper])/np.trapz(fftFrequencies,fftValues))
+           filteredNoise.append(np.multiply(np.fft.irfft(fftSingleTraceValues[i][cutoffIndexLower:cutoffIndexUpper],norm="ortho"),1.0))
            
         else:
-           fftSingleTraceValues.append(np.fft.rfft(noise_traces[i]))
+           fftSingleTraceValues.append(np.fft.rfft(noise_traces[i],norm="ortho"))
            fftValues += np.absolute(np.fft.rfft(noise_traces[i]))
-           filteredNoise.append(np.fft.irfft(fftSingleTraceValues[i][cutoffIndexLower:cutoffIndexUpper]))
+           scalingFactor.append(np.trapz(fftFrequencies[cutoffIndexlower:cutoffIndexUpper],fftValues[cutoffIndexlower:cutoffIndexUpper])/np.trapz(fftFrequencies,fftValues))
+           filteredNoise.append(np.multiply(np.fft.irfft(fftSingleTraceValues[i][cutoffIndexLower:cutoffIndexUpper]),1.0))
 
     timeValues = np.arange(0,np.amax(time_trace),np.amax(time_trace)/len(filteredNoise[0]))
     plt.figure(20)
@@ -321,9 +323,13 @@ if __name__=="__main__":
         negPeakNoise = []
         absPeakNoise  = []
         try:
-            x1,y1 = calc.readPickleChannel(os.path.join(noise_dir,noise_file), 1,False)
-        except:
+            x1,y1 = calc.readPickleChannelPadY(os.path.join(noise_dir,noise_file), 1,False)
+        except Exception,e:
+            print str(e) 
             continue
+        print "READ IN FILES"
+        print "NOISE FILE: "+noise_file
+        print "TRACE COUNT: "+str(len(y1))
         for i in range(len(y1)):
             noise_traces.append(y1[i])
             posPeakNoise.append(np.amax(y1[i]))
@@ -333,7 +339,7 @@ if __name__=="__main__":
             absPeakNoiseTotal.append(np.amax(np.fabs(y1[i])))
             absPeakNoise.append(np.amax(np.fabs(y1[i])))
        
-        
+        print "Doing noise analysis" 
         absPeakNoiseAvg.append(np.mean(absPeakNoise))
         absPeakNoiseError.append(np.std(absPeakNoise)/np.sqrt(len(absPeakNoise)))
         posPeakNoiseAvg.append(np.mean(posPeakNoise))
@@ -425,7 +431,8 @@ if __name__=="__main__":
    
     posNoiseVsPhoton = ROOT.TH2D("MaximumNoiseVoltageVsPhotonCount","MaximumNoiseVoltageVsPhotonCount",15,np.amin(posPeakNoiseTotal)-.01,np.amax(posPeakNoiseTotal)+.01,75,np.amin(photonCounts)-100,np.amax(photonCounts)+100) 
     negNoiseVsPhoton = ROOT.TH2D("MaximumNegativeNoiseVoltageVsPhotonCount","MaximumNegativeNoiseVoltageVsPhotonCount",15,np.amin(negPeakNoiseTotal)-.01,np.amax(negPeakNoiseTotal)+.01,75,np.amin(photonCounts)-100,np.amax(photonCounts)+100) 
-    
+    print "LEN of posPeakNoise: "+str(len(posPeakNoiseTotal)) 
+    print "LEN of photonCounts: "+str(len(photonCounts)) 
     for i in range(len(photonCounts)):
         posNoiseVsPhoton.Fill(posPeakNoiseTotal[i],photonCounts[i])
         negNoiseVsPhoton.Fill(negPeakNoiseTotal[i],photonCounts[i])
@@ -505,7 +512,7 @@ if __name__=="__main__":
     else:
         plt.savefig(root_dir+"/root_files/Box_%02d/Channel_%02d/meanAbsPeakNoiseVsPINWidth%05d.png"%(box,channel,width))
 
-    readingsCount = range(1,22)
+    readingsCount = range(1,len(photonCountsAverage))
     plt.figure(6)
     plt.xlabel("Reading Number")
     sub = plt.subplot(2,2,1)

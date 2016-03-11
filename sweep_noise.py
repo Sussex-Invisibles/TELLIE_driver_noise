@@ -224,7 +224,7 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     sc.set_pulse_delay(delay)
     sc.set_fibre_delay(fibre_delay)
     sc.set_trigger_delay(trigger_delay)
-    ck =find_and_set_scope_y_scale(1,height,width,0,scope,0.2)
+    ck =find_and_set_scope_y_scale(1,height,width,0,scope,0.05)
     scope.set_edge_trigger(1.4, 2 , falling=False) # Rising edge trigger 
     print "Set up TELLIE" 
     # first, run a single acquisition with a forced trigger, effectively to clear the waveform
@@ -245,6 +245,64 @@ def sweep_noise(dirs_out,box,channel,width,delay,scope,min_volt=None):
     print "Fired TELLIE"
     fileNames = [fname0,fname1]
     channels = [1,4]
+    saved = save_scopeTraces_Multiple(fileNames,scope,channels,100)
+    #save_ck0 = save_scopeTraces(fname0, scope, 1, 100)
+    #save_ck1 = save_scopeTraces(fname1, scope, 3, 100)
+    print "Saved scope traces"
+    #sleeping for 5 seconds to ensure TELLIE has stopped pulsing
+    time.sleep(5)
+    pin = None
+    # while not comms_flags.valid_pin(pin,channel):
+    while pin==None:
+        pin,rms,chans = sc.tmp_read_rms()
+        print pin
+        print chans
+    return pulse_number,pin[logical_channel],rms[logical_channel]
+
+def sweep_noise_led_legs(dirs_out,box,channel,width,delay,scope,min_volt=None):
+    """Perform a measurement using a default number of
+    pulses, with user defined width, channel and rate settings.
+    """
+    print '____________________________'
+    print width
+
+    #fixed options
+    height = 16383    
+    fibre_delay = 0
+    trigger_delay = 0
+    pulse_number = 11100
+    #first select the correct channel and provide settings
+    logical_channel = (box-1)*8 + channel
+    sc.select_channel(logical_channel)
+    sc.set_pulse_width(width)
+    sc.set_pulse_height(16383)
+    sc.set_pulse_number(pulse_number)
+    sc.set_pulse_delay(delay)
+    sc.set_fibre_delay(fibre_delay)
+    sc.set_trigger_delay(trigger_delay)
+    ck =find_and_set_scope_y_scale(1,height,width,0,scope,0.2)
+    scope.set_edge_trigger(1.4, 2 , falling=False) # Rising edge trigger 
+    print "Set up TELLIE" 
+    # first, run a single acquisition with a forced trigger, effectively to clear the waveform
+    scope._connection.send("trigger:state ready")
+    time.sleep(0.1)
+    scope._connection.send("trigger force")
+    time.sleep(0.1)
+    print "Reset Scope"
+    # File system stuff
+    fname0 = "%sWidth%05d" % (dirs_out[0],width)
+    fname1 = "%sWidth%05d" % (dirs_out[1],width)
+    fname2 = "%sWidth%05d" % (dirs_out[2],width)
+    
+    print "Set up Files" 
+    # Check scope
+    print "Saving raw pmt  files to: %s..." % fname0
+    print "Saving left leg  files to: %s..." % fname1
+    print "Saving right leg  files to: %s..." % fname1
+    sc.fire_sequence()
+    print "Fired TELLIE"
+    fileNames = [fname0,fname1,fname2]
+    channels = [1,4,3]
     saved = save_scopeTraces_Multiple(fileNames,scope,channels,100)
     #save_ck0 = save_scopeTraces(fname0, scope, 1, 100)
     #save_ck1 = save_scopeTraces(fname1, scope, 3, 100)
