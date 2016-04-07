@@ -1,11 +1,8 @@
 ###################################################
-# Pulses TELLIE in continuous mode.
-# This script produces a continuous
-# signal to allow for adjustments of
-# the PIN diode pots.
-# 
-# Author: Ed Leming <e.leming09@googlemail.com>
-# Date: 01/05/15
+# Live plots of PIN readings and photon counts
+
+# Author: Mark Stringer <ms711@sussex.ac.uk>
+# Date: 29/03/16
 ###################################################
 from core import serial_command
 import optparse
@@ -32,7 +29,7 @@ chan = 0
 width = 0
 pulse_number = 0 
 pulse_delay = 0.1
-num_traces = 20
+num_traces = 40
 
 def safe_exit(sc,e, fname):
     print "Exit safely"
@@ -45,15 +42,7 @@ def safe_exit(sc,e, fname):
     sc.stop()
     pin_dict, rms_dict, this_channel = sc.read_pin(chan)
  
-    #Now writing data file
-    outputFile = open(sweep_noise.check_dir("liveProbePlots/%s/DATA_%s.dat"%(fname, timestamp)),"w")
-    outputFile.write("Channel: %02d     Frequency: %f IPW: %d NPulses: %d NTraces: %d\n" % (chan,1.0/pulse_delay,width,pulse_number,num_traces))
-    outputFile.write("Reading #  Time since start (seconds)  PIN Value  Pin Error  Photon Count  Photon Count Error\n")
     
-    for i in range(len(readings)):
-        print pulseTimes
-        print readings
-        outputFile.write("%d %f %f %f %f %f\n" %(readings[i],pulseTimes[i],pinValues[i+1],pinErrors[i+1],photonCount[i+1],photonCountError[i+1]))
     
     outputFile.close() 
     print pin_dict
@@ -97,9 +86,9 @@ if __name__=="__main__":
     ###########################################
     scope_channels = 1 # We're using channel 1 and 3 (1 for PMT 3 for probe point and 2 for the trigger signal)!
     termination = 50 # Ohms
-    trigger_level = -0.02 # 
+    trigger_level = -0.01 # 
     falling_edge = True
-    y_div_units = 0.05 # volts
+    y_div_units = 0.01 # volts
     x_div_units = 4e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
     record_length = 1e3 # trace is 100e3 samples long
@@ -164,6 +153,11 @@ if __name__=="__main__":
     counter = 0
     startTime  = time.time()
     timestamp = time.strftime("%y%m%d_%H.%M.%S",time.gmtime())
+    outputFile = open(sweep_noise.check_dir("liveProbePlots/%s/DATA_%s.dat"%(options.fileName, timestamp)),"w")
+    #Now writing data file header
+    outputFile.write("Channel: %02d     Frequency: %f IPW: %d NPulses: %d NTraces: %d\n" % (chan,1.0/pulse_delay,width,pulse_number,num_traces))
+    outputFile.write("Reading #  Time since start (seconds)  PIN Value  Pin Error  Photon Count  Photon Count Error\n")
+    print "WROTE HEADER"
     try: 
         while True:
             print "Event no: %i" % counter
@@ -209,6 +203,9 @@ if __name__=="__main__":
 			plt.xlabel("PIN Reading")
 			plt.ylabel("Photon Count")
 			plt.draw()
+	                outputFile.write("%d %f %f %f %f %f\n" %(readings[-1],pulseTimes[-1],pinValues[-1],pinErrors[-1],photonCount[-1],photonCountError[-1]))
+                        outputFile.flush()
+                        os.fsync(outputFile)
 
 			plt.pause(0.001)
             counter = counter + 1
