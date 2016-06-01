@@ -60,6 +60,8 @@ def safe_exit(sc,e, fname):
     plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/Pin_Photons_Sub_Chan_%d_%s.png"%(fname,chan,timestamp)))
     plt.figure(1)
     plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/PinVSPhoton_Chan_%d_%s.png"%(fname, chan,timestamp)))
+    plt.figure(3)
+    plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/TriggerPulseOffset_Chan_%d_%s.png"%(fname, chan,timestamp)))
     #Write out hit histo to root file
     outROOTFile = ROOT.TFile(sweep_noise.check_dir("liveProbePlots/%s/SinglePhotonCountHisto_%d_%s.root"%(fname, chan,timestamp)),"recreate")
     outHisto = ROOT.TH1I("Single_Pulse_Photon_Counts","Single Pulse Photon Counts",int(np.max(singleTracePhotonCounts)-np.min(singleTracePhotonCounts)+40),float(np.min(singleTracePhotonCounts)-20),float(np.max(singleTracePhotonCounts)+20))
@@ -243,7 +245,7 @@ if __name__=="__main__":
 			plt.draw()
 			plt.figure(3)
 			plt.clf()
-			plt.plot(np.multiply(x1,1e9),np.mean(y1,axis=0))
+			plt.plot(np.add(np.multiply(x1,1e9),x_offset),np.mean(y1,axis=0))
 			plt.xlabel("Time (ns)")
 			plt.ylabel("volts")
 			plt.draw()
