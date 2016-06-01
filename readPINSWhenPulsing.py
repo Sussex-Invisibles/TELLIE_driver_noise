@@ -32,7 +32,7 @@ pulseTimes = []
 chan = 0
 width = 0
 pulse_number = 0 
-pulse_delay = 0.1
+pulse_delay = 1 #In ms
 num_traces = 40
 
 #Method to calculate the area of all the traces
@@ -43,7 +43,7 @@ def calcAreaArray(x,y):
         trapz[i] = np.trapz(y[i,:],x)
     return trapz
 
-def get_pmt_time_and_spread(x1,y1,pulse_thresh=-5e-2):
+def get_pmt_time_and_spread(x1,y1,pulse_thresh=-5e-3):
      pmt_times = []
      for i in range(len(y1)):
 	 if np.min(y1[i]) < pulse_thresh:
@@ -60,7 +60,7 @@ def safe_exit(sc,e, fname):
     plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/Pin_Photons_Sub_Chan_%d_%s.png"%(fname,chan,timestamp)))
     plt.figure(1)
     plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/PinVSPhoton_Chan_%d_%s.png"%(fname, chan,timestamp)))
-    plt.figure(3)
+    plt.figure(4)
     plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/TriggerPulseOffset_Chan_%d_%s.png"%(fname, chan,timestamp)))
     #Write out hit histo to root file
     outROOTFile = ROOT.TFile(sweep_noise.check_dir("liveProbePlots/%s/SinglePhotonCountHisto_%d_%s.root"%(fname, chan,timestamp)),"recreate")
@@ -119,7 +119,7 @@ if __name__=="__main__":
     termination = [50,50] # Ohms
     trigger_level = 1.0# 
     falling_edge = False
-    y_div_units = [0.1,1.0] # volts
+    y_div_units = [0.01,1.0] # volts
     x_div_units = 100e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
     record_length = 10e3 # trace is 100e3 samples long
@@ -153,13 +153,13 @@ if __name__=="__main__":
     channel = (int(options.box)-1)*8 + int(options.channel)
     chan = channel
     width = int(options.width)
-    pulse_number = 5000
+    pulse_number = 500
     sc = serial_command.SerialCommand("/dev/tty.usbserial-FTE3C0PG")
     sc.stop()
     sc.select_channel(channel)
     sc.set_pulse_height(16383)
     sc.set_pulse_width(width)
-    sc.set_pulse_delay(1)
+    sc.set_pulse_delay(pulse_delay)
     sc.set_trigger_delay(0)
     sc.set_fibre_delay(0)
     #sc.set_pulse_delay(25e-3) 
@@ -189,7 +189,7 @@ if __name__=="__main__":
     timestamp = time.strftime("%y%m%d_%H.%M.%S",time.gmtime())
     outputFile = open(sweep_noise.check_dir("liveProbePlots/%s/DATA_%s.dat"%(options.fileName, timestamp)),"w")
     #Now writing data file header
-    outputFile.write("Channel: %02d     Frequency: %f IPW: %d NPulses: %d NTraces: %d\n" % (chan,1.0/pulse_delay,width,pulse_number,num_traces))
+    outputFile.write("Channel: %02d     Frequency: %f IPW: %d NPulses: %d NTraces: %d\n" % (chan,1.0/(pulse_delay*1e3),width,pulse_number,num_traces))
     outputFile.write("Reading #  Time since start (seconds)  PIN Value  Pin Error  Photon Count  Photon Count Error PMT Time (ns), PMT Time Err (ns)\n")
     print "WROTE HEADER"
     try: 
@@ -201,7 +201,7 @@ if __name__=="__main__":
             save_ck0 = sweep_noise.save_scopeTraces("./tempTraces", scope, 1, num_traces)
                 
 	    #sleeping for 5 seconds to ensure TELLIE has stopped pulsing
-            sleep_time = ((0.1/1e3)*pulse_number)+0.05
+            sleep_time = ((pulse_delay*1e-3)*pulse_number)+0.05
             time.sleep(sleep_time+3)
             pin = None
 	    # while not comms_flags.valid_pin(pin,channel):
