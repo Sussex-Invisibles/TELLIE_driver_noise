@@ -1,5 +1,5 @@
 ###################################################
-# Live plots of PIN readings and photon counts
+# Live plots of PIN readings and photon counts also plots 
 
 # Author: Mark Stringer <ms711@sussex.ac.uk>
 # Date: 29/03/16
@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import scopes
 import scope_connections
 import sweep_noise
+import ROOT
 
 
 pinValues = []
@@ -22,6 +23,9 @@ pinErrors = []
 readings = []
 photonCount  = []
 photonCountError  = []
+singleTracePhotonCounts = []
+pmtTime = [] #Gap between time pmt crosses 10% of max value and trigger signal in (ns)
+pmtTimeErr = []
 startTime = 0
 timestamp = 0
 pulseTimes = []
@@ -31,15 +35,40 @@ pulse_number = 0
 pulse_delay = 0.1
 num_traces = 40
 
+#Method to calculate the area of all the traces
+def calcAreaArray(x,y):
+    """Calc area of pulses"""
+    trapz = np.zeros( len(y[:,0]) )
+    for i in range(len(y[:,0])):
+        trapz[i] = np.trapz(y[i,:],x)
+    return trapz
+
+def get_pmt_time_and_spread(x1,y1,pulse_thresh=-5e-2):
+     pmt_times = []
+     for i in range(len(y1)):
+	 if np.min(y1[i]) < pulse_thresh:
+            pmt_times.append(calc.interpolate_threshold(x1,y1[i],pulse_thresh,rise=False))
+     pmt_time_avg = np.mean(pmt_times)
+     pmt_time_err = np.std(pmt_times)/np.sqrt(len(pmt_times))
+     return pmt_time_avg*1.0e9, pmt_time_err*1.0e9
+
 def safe_exit(sc,e, fname):
     print "Exit safely"
     print e
     print timestamp
     plt.figure(0)
-    plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/Pin_Photons_Sub_%s.png"%(fname, timestamp)))
+    plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/Pin_Photons_Sub_Chan_%d_%s.png"%(fname,chan,timestamp)))
     plt.figure(1)
-    plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/PinVSPhoton_%s.png"%(fname, timestamp)))
+    plt.savefig(sweep_noise.check_dir("liveProbePlots/%s/PinVSPhoton_Chan_%d_%s.png"%(fname, chan,timestamp)))
+    #Write out hit histo to root file
+    outROOTFile = ROOT.TFile(sweep_noise.check_dir("liveProbePlots/%s/SinglePhotonCountHisto_%d_%s.root"%(fname, chan,timestamp)),"recreate")
+    outHisto = ROOT.TH1I("Single_Pulse_Photon_Counts","Single Pulse Photon Counts",int(np.max(singleTracePhotonCounts)-np.min(singleTracePhotonCounts)+40),float(np.min(singleTracePhotonCounts)-20),float(np.max(singleTracePhotonCounts)+20))
+    for singlePhotonCount in singleTracePhotonCounts:
+	outHisto.Fill(singlePhotonCount)
+    outHisto.Write()
+    outROOTFile.Close()
     sc.stop()
+     
     pin_dict, rms_dict, this_channel = sc.read_pin(chan)
  
     
@@ -53,10 +82,10 @@ def get_photons(volts_seconds,applied_volts):
     Can accept -ve or +ve pulse
     """
     impedence = 50.0 
-    eV = (6.626e-34 * 3e8) / (500e-9)
+    eV = 1.61e-19
     qe = 0.192 # @ 501nm
     gain = get_gain(applied_volts)
-    photons = np.fabs(volts_seconds) / (impedence * eV * gain * qe)
+    photons = np.fabs(volts_seconds) /(impedence * eV * gain * qe)
     return photons
 
 def get_gain(applied_volts):
@@ -84,14 +113,14 @@ if __name__=="__main__":
     usb_conn = scope_connections.VisaUSB()
     scope = scopes.Tektronix3000(usb_conn)
     ###########################################
-    scope_channels = 1 # We're using channel 1 and 3 (1 for PMT 3 for probe point and 2 for the trigger signal)!
-    termination = 50 # Ohms
-    trigger_level = -0.01 # 
-    falling_edge = True
-    y_div_units = 0.01 # volts
-    x_div_units = 4e-9 # seconds
+    scope_channels = [1,2] # We're using channel 1 and 3 (1 for PMT 3 for probe point and 2 for the trigger signal)!
+    termination = [50,50] # Ohms
+    trigger_level = 1.0# 
+    falling_edge = False
+    y_div_units = [0.1,1.0] # volts
+    x_div_units = 100e-9 # seconds
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
-    record_length = 1e3 # trace is 100e3 samples long
+    record_length = 10e3 # trace is 100e3 samples long
     half_length = record_length / 2 # For selecting region about trigger point
     ###########################################
     scope.unlock()
@@ -101,12 +130,15 @@ if __name__=="__main__":
     scope.set_single_acquisition() # Single signal acquisition mode
     scope.set_record_length(record_length)
     scope.set_active_channel(1)
-    scope.set_data_mode(half_length-25, half_length+50)
-    scope.set_edge_trigger(trigger_level, 1 , falling=falling_edge) 
-    y_offset = -2.5*y_div_units
-    scope.set_channel_y(1, y_div_units, pos=2.5)
-    scope.set_display_y(1, y_div_units, offset=y_offset)
-    scope.set_channel_termination(1, termination)
+    scope.set_active_channel(2)
+    scope.set_data_mode(half_length, half_length+900)
+    scope.set_edge_trigger(trigger_level, 2 , falling=False) # Rising edge trigger 
+    y_offset = [-2.5*y_div_units[0],2.5*y_div_units[1]]
+    for i in range(len(scope_channels)):
+	    scope.set_channel_y(scope_channels[i], y_div_units[i], pos=2.5)
+	    scope.set_display_y(scope_channels[i], y_div_units[i], offset=y_offset[i])
+	    #scope.set_display_y(scope_chan, y_div_units, offset=y_offset)
+	    scope.set_channel_termination(scope_channels[i], termination[i])
     scope.lock()
     scope.begin() # Acquires the pre-amble! 
 
@@ -125,7 +157,7 @@ if __name__=="__main__":
     sc.select_channel(channel)
     sc.set_pulse_height(16383)
     sc.set_pulse_width(width)
-    sc.set_pulse_delay(0.1)
+    sc.set_pulse_delay(1)
     sc.set_trigger_delay(0)
     sc.set_fibre_delay(0)
     #sc.set_pulse_delay(25e-3) 
@@ -156,7 +188,7 @@ if __name__=="__main__":
     outputFile = open(sweep_noise.check_dir("liveProbePlots/%s/DATA_%s.dat"%(options.fileName, timestamp)),"w")
     #Now writing data file header
     outputFile.write("Channel: %02d     Frequency: %f IPW: %d NPulses: %d NTraces: %d\n" % (chan,1.0/pulse_delay,width,pulse_number,num_traces))
-    outputFile.write("Reading #  Time since start (seconds)  PIN Value  Pin Error  Photon Count  Photon Count Error\n")
+    outputFile.write("Reading #  Time since start (seconds)  PIN Value  Pin Error  Photon Count  Photon Count Error PMT Time (ns), PMT Time Err (ns)\n")
     print "WROTE HEADER"
     try: 
         while True:
@@ -175,15 +207,21 @@ if __name__=="__main__":
 		pin,rms,chans = sc.tmp_read_rms()
                 x1,y1 = calc.readPickleChannel("./tempTraces.pkl", 1,True)
                 num_photons_average_rms =  get_photons(calc.calcArea(x1,y1),0.7)
-                
+		singleTraceAreas = calcAreaArray(x1,y1)
+	        singlePMTTime, singlePMTTimeErr = get_pmt_time_and_spread(x1,y1)
                 print "LEN Y1: "+str(len(y1))
                 if counter != 0:
                     photonCount.append(num_photons_average_rms[0])
                     photonCountError.append(num_photons_average_rms[1]/np.sqrt(len(y1)))
+		    pmtTime.append(singlePMTTime)
+	            pmtTimeErr.append(singlePMTTimeErr)
+                    for singleArea in singleTraceAreas:
+		    	singleTracePhotonCounts.append(get_photons(singleArea,0.7))
                 os.system("rm ./tempTraces.pkl")
                 print "\n====================================="
                 print "%1.1f +/- %1.3f" % (float(pin[channel]), float(rms[channel])/np.sqrt(pulse_number))
                 if counter != 0:
+			
 			pinValues.append(float(pin[channel]))
 			pinErrors.append(float(rms[channel])/np.sqrt(pulse_number))
 			readings = range(1,len(pinValues[1:])+1)
@@ -203,7 +241,19 @@ if __name__=="__main__":
 			plt.xlabel("PIN Reading")
 			plt.ylabel("Photon Count")
 			plt.draw()
-	                outputFile.write("%d %f %f %f %f %f\n" %(readings[-1],pulseTimes[-1],pinValues[-1],pinErrors[-1],photonCount[-1],photonCountError[-1]))
+			plt.figure(3)
+			plt.clf()
+			plt.plot(np.multiply(x1,1e9),np.mean(y1,axis=0))
+			plt.xlabel("Time (ns)")
+			plt.ylabel("volts")
+			plt.draw()
+			plt.figure(4)
+			plt.clf()
+			plt.errorbar(readings,pmtTime,yerr=pmtTimeErr)
+			plt.xlabel("Reading")
+			plt.ylabel("PMT Time (ns)")
+			plt.draw()
+	                outputFile.write("%d %f %f %f %f %f %f %f\n" %(readings[-1],pulseTimes[-1],pinValues[-1],pinErrors[-1],photonCount[-1],photonCountError[-1],pmtTime[-1],pmtTimeErr[-1]))
                         outputFile.flush()
                         os.fsync(outputFile)
 
